@@ -34,8 +34,8 @@ nearestSimplex[2] = function (s, d) {
 }
 
 nearestSimplex[3] = function (s, d) {
-  const ac = s[2].copy().sub(s[0])
-  const bc = s[2].copy().sub(s[1])
+  const ac = s[2].clone().sub(s[0])
+  const bc = s[2].clone().sub(s[1])
   const abc = ac.clone().cross(bc)
 
   const acn = ac.clone().cross(abc)
@@ -141,16 +141,24 @@ nearestSimplex[4] = function (s, d) {
   }
 }
 
-export function gjk (a, b, d, s) {
+export function gjk (aSupport, bSupport, d = new Vector3(1, 0, 0), s = []) {
   while (true) {
-    const p = a.support(d).sub(b.support(d))
+    if (d.lengthSq() === 0) {
+      d.set(
+        Math.random() - Math.random(),
+        Math.random() - Math.random(),
+        Math.random() - Math.random()
+      )
+    }
+    const p = aSupport(d).sub(bSupport(d.negate()))
+    d.negate()
 
-    if (p.dot(d) <= 0) {
+    if (p.dot(d) < 0) {
       return false
     }
 
     /* Add to the simplex. */
-    s.push_back(p)
+    s.push(p)
 
     if (nearestSimplex[s.length](s, d)) {
       return true
@@ -160,16 +168,17 @@ export function gjk (a, b, d, s) {
 
 export function getOverlap (
   out,
-  a,
-  b,
+  aSupport,
+  bSupport,
   initialAxis
 ) {
   const s = []
-  const d = a.support(initialAxis).sub(b.support(initialAxis))
+  const d = aSupport(initialAxis).sub(bSupport(initialAxis.negate()))
+  initialAxis.negate()
   s.push(d)
   d.negate()
 
-  if (gjk(a, b, d, s)) {
+  if (gjk(aSupport, bSupport, d, s)) {
     if (s.length < 4) {
       out.set(0, 0, 0)
     } else {
@@ -182,8 +191,15 @@ export function getOverlap (
       triangles.push(makeTriangle(1, 2, 3, vertices))
       triangles.push(makeTriangle(2, 0, 3, vertices))
 
-      // epa(out, a, b, triangles, vertices, other)
+      // epa(out, aSupport, bSupport, triangles, vertices, other)
     }
     return true
   }
+}
+
+export function sphere ({ position, radius }) {
+  const p = new Vector3(...position)
+  return (d) => (
+    d.clone().normalize().multiplyScalar(radius).add(p)
+  )
 }
