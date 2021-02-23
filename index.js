@@ -1,4 +1,4 @@
-import { Matrix4 } from 'three'
+import { Vector3 } from 'three'
 
 function makeTriangle (ia, ib, ic, vertices) {
   const ac = vertices[ic].clone().sub(vertices[ia])
@@ -88,7 +88,7 @@ nearestSimplex[4] = function (s, d) {
   const bcd = cd.clone().cross(bd)
   const cad = ad.clone().cross(cd)
 
-  const specialCase = (s1, s2) {
+  const specialCase = (s1, s2) => {
     const d1 = new Vector3()
     const d2 = new Vector3()
 
@@ -136,8 +136,8 @@ nearestSimplex[4] = function (s, d) {
       return false
     }
   } else {
-      specialCase([s[0], s[1], s[3]], [s[1], s[2], s[3]])
-      return false
+    specialCase([s[0], s[1], s[3]], [s[1], s[2], s[3]])
+    return false
   }
 }
 
@@ -176,13 +176,13 @@ export function getOverlap (
       /* Create a triangular mesh for the simplex. */
       const triangles = []
       const vertices = s
-      
+
       triangles.push(makeTriangle(0, 2, 1, vertices))
       triangles.push(makeTriangle(0, 1, 3, vertices))
       triangles.push(makeTriangle(1, 2, 3, vertices))
       triangles.push(makeTriangle(2, 0, 3, vertices))
 
-      epa(out, a, b, triangles, vertices, other)
+      // epa(out, a, b, triangles, vertices, other)
     }
     return true
   }
