@@ -53,7 +53,7 @@ nearestSimplex[3] = function (s, d) {
       }
     } else {
       if (bc.dot(s[2]) <= 0) {
-        s[0] = s.pop()
+        s.splice(0, 2)
         d.copy(s[0]).negate()
         return false
       } else {
@@ -129,7 +129,8 @@ nearestSimplex[4] = function (s, d) {
     }
   } else if (bcd.dot(s[3]) <= 0) {
     if (cad.dot(s[3]) <= 0) {
-      s[2] = s.pop()
+      s[2] = s[0]
+      s[0] = s.pop()
       return nearestSimplex[3](s, d)
     } else {
       specialCase([s[0], s[1], s[3]], [s[2], s[0], s[3]])
@@ -141,7 +142,13 @@ nearestSimplex[4] = function (s, d) {
   }
 }
 
-export function gjk (aSupport, bSupport, d = new Vector3(1, 0, 0), s = []) {
+export function gjk (
+  aSupport,
+  bSupport,
+  d = new Vector3(1, 0, 0),
+  s = [],
+  threshold = 0.001
+) {
   while (true) {
     if (d.lengthSq() === 0) {
       d.set(
@@ -153,7 +160,7 @@ export function gjk (aSupport, bSupport, d = new Vector3(1, 0, 0), s = []) {
     const p = aSupport(d).sub(bSupport(d.negate()))
     d.negate()
 
-    if (p.dot(d) < 0) {
+    if (p.dot(d) < threshold) {
       return false
     }
 
@@ -197,9 +204,31 @@ export function getOverlap (
   }
 }
 
-export function sphere ({ position, radius }) {
-  const p = new Vector3(...position)
+/**
+ * Returns a sphere support function given the position and radius.
+ */
+export function sphere ({
+  position,
+  radius
+}) {
+  const p = position ? new Vector3(...position) : new Vector3()
+  const r = radius || 1
   return (d) => (
-    d.clone().normalize().multiplyScalar(radius).add(p)
+    d.clone().normalize().multiplyScalar(r).add(p)
+  )
+}
+
+export function box ({
+  position,
+  size
+}) {
+  const p = position || [0, 0, 0]
+  const s = size || [1, 1, 1]
+  return (d) => (
+    new Vector3(
+      p[0] + s[0] * (d.x < 0 ? -0.5 : 0.5),
+      p[1] + s[1] * (d.y < 0 ? -0.5 : 0.5),
+      p[2] + s[2] * (d.z < 0 ? -0.5 : 0.5)
+    )
   )
 }
