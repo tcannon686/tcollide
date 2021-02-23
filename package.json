@@ -1,0 +1,12 @@
+{
+  "name": "collide",
+  "version": "1.0.0",
+  "description": "A simple collision detection library for three.js",
+  "type": "module",
+  "main": "index.js",
+  "author": "Thomas Cannon <tom-cannon@playcannon.com>",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.125.2"
+  }
+}
