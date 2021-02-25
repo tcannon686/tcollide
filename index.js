@@ -176,16 +176,21 @@ export function gjk (
   s = [],
   tolerance = 0.001
 ) {
+  const a = new Vector3()
+  const b = new Vector3()
   while (true) {
-    const p = aSupport(d).sub(bSupport(d.negate()))
-    d.negate()
+    a.copy(d)
+    b.copy(d).negate()
+    aSupport(a)
+    bSupport(b)
+    a.sub(b)
 
-    if (p.dot(d) < tolerance) {
+    if (a.dot(d) < tolerance) {
       return false
     }
 
     /* Add to the simplex. */
-    s.push(p)
+    s.push(a.clone())
 
     if (nearestSimplex[s.length](s, d)) {
       return true
@@ -202,6 +207,9 @@ export function epa (
   vertices,
   tolerance = 0.1
 ) {
+  const a = new Vector3()
+  const b = new Vector3()
+
   let nearest
   while (true) {
     const edgeCounts = {}
@@ -220,8 +228,13 @@ export function epa (
     nearest = triangles.reduce((m, x) => (
       x.distance < m.distance ? x : m
     ), triangles[0])
-    const a = aSupport(nearest.normal).sub(bSupport(nearest.normal.negate()))
-    nearest.normal.negate()
+
+    a.copy(nearest.normal)
+    b.copy(nearest.normal)
+    b.negate()
+    aSupport(a)
+    bSupport(b)
+    a.sub(b)
 
     if (a.dot(nearest.normal) - nearest.distance > tolerance) {
       for (let i = 0; i < triangles.length; i++) {
@@ -237,7 +250,7 @@ export function epa (
       }
 
       /* Add the new vertex. */
-      vertices.push(a)
+      vertices.push(a.clone())
 
       /* Create new faces from non-shared edges. */
       for (const key in edgeCounts) {
@@ -277,25 +290,40 @@ export function getOverlap (
 
     /* Add extra vertices if needed. */
     if (vertices.length <= 2) {
-      let v
+      const a = new Vector3(0, 0, 0)
+      const b = new Vector3(0, 0, 0)
       do {
         randomizeDirection(d)
-        v = aSupport(d).sub(bSupport(d.negate()))
-        d.negate()
-      } while (vertices.find(x => x.equals(v)))
+        a.copy(d)
+        b.copy(d)
+        b.negate()
+        aSupport(a)
+        bSupport(b)
+        a.sub(b)
+      } while (vertices.find(x => x.equals(a)))
 
-      vertices.push(v)
+      vertices.push(a)
     }
 
     if (vertices.length === 3) {
       const t = makeTriangle(0, 2, 1, vertices)
-      let v = aSupport(t.normal.negate()).sub(bSupport(t.normal.negate()))
-      if (vertices.find(x => x.equals(v))) {
+      const a = new Vector3().copy(t.normal).negate()
+      const b = new Vector3().copy(t.normal)
+      aSupport(a)
+      bSupport(b)
+      a.sub(b)
+      if (vertices.find(x => x.equals(a))) {
         t.normal.negate()
-        vertices.unshift(vertices.pop())
-        v = aSupport(t.normal.negate()).sub(bSupport(t.normal.negate()))
+        const tmp = vertices[0]
+        vertices[0] = vertices[2]
+        vertices[2] = tmp
+        a.copy(t.normal).negate()
+        b.copy(t.normal)
+        aSupport(a)
+        bSupport(b)
+        a.sub(b)
       }
-      vertices.push(v)
+      vertices.push(a)
     }
 
     triangles.push(makeTriangle(0, 2, 1, vertices))
@@ -321,13 +349,16 @@ export function sphere ({
   position,
   radius
 }) {
-  const p = position ? new Vector3(...position) : new Vector3()
+  const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
   const r = radius || 1.0
   return (d) => (
-    d.clone().normalize().multiplyScalar(r).add(p)
+    d.normalize().multiplyScalar(r).add(p)
   )
 }
 
+/**
+ * Returns a box support function given the position and size.
+ */
 export function box ({
   position,
   size
@@ -335,7 +366,7 @@ export function box ({
   const p = position || [0, 0, 0]
   const s = size || [1, 1, 1]
   return (d) => (
-    new Vector3(
+    d.set(
       p[0] + s[0] * (d.x < 0 ? -0.5 : 0.5),
       p[1] + s[1] * (d.y < 0 ? -0.5 : 0.5),
       p[2] + s[2] * (d.z < 0 ? -0.5 : 0.5)
