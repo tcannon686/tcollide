@@ -1,9 +1,14 @@
 import { Vector3 } from 'three'
+import assert from 'assert'
 
 function makeTriangle (ia, ib, ic, vertices) {
   const ac = vertices[ic].clone().sub(vertices[ia])
   const bc = vertices[ic].clone().sub(vertices[ib])
-  const normal = ac.cross(bc).normalize()
+  const normal = ac.cross(bc)
+
+  assert(normal.lengthSq() !== 0)
+  normal.normalize()
+
   const distance = normal.dot(vertices[ic])
 
   return {
@@ -15,31 +20,46 @@ function makeTriangle (ia, ib, ic, vertices) {
   }
 }
 
+function randomizeDirection (d) {
+  do {
+    d.set(
+      Math.random() - Math.random(),
+      Math.random() - Math.random(),
+      Math.random() - Math.random()
+    )
+  } while (d.lengthSq() === 0)
+  d.normalize()
+}
+
 const nearestSimplex = new Array(5)
 nearestSimplex[1] = function (s, d) {
-  d.set(0, 0, 0).sub(s[0])
-  return d.dot(d) === 0
+  assert(s.length === 1)
+  d.copy(s[0]).negate()
+  return d.lengthSq() === 0
 }
 
 nearestSimplex[2] = function (s, d) {
+  assert(s.length === 2)
   const ab = s[1].clone().sub(s[0])
   if (ab.dot(s[1]) <= 0) {
-    s[0] = s.pop()
+    s.shift()
     d.copy(s[0]).negate()
-    return false
   } else {
     d.copy(s[0]).cross(ab).cross(ab)
-    return false
   }
+  return d.lengthSq() === 0
 }
 
 nearestSimplex[3] = function (s, d) {
+  assert(s.length === 3)
   const ac = s[2].clone().sub(s[0])
   const bc = s[2].clone().sub(s[1])
   const abc = ac.clone().cross(bc)
 
   const acn = ac.clone().cross(abc)
   const bcn = abc.clone().cross(bc)
+
+  assert(d.dot(s[2]) >= d.dot(s[0]) && d.dot(s[2]) >= d.dot(s[1]))
 
   if (acn.dot(s[2]) <= 0) {
     if (bcn.dot(s[2]) <= 0) {
@@ -80,6 +100,8 @@ nearestSimplex[3] = function (s, d) {
 }
 
 nearestSimplex[4] = function (s, d) {
+  assert(s.length === 4)
+
   const ad = s[3].clone().sub(s[0])
   const bd = s[3].clone().sub(s[1])
   const cd = s[3].clone().sub(s[2])
@@ -87,6 +109,12 @@ nearestSimplex[4] = function (s, d) {
   const abd = bd.clone().cross(ad)
   const bcd = cd.clone().cross(bd)
   const cad = ad.clone().cross(cd)
+
+  assert(
+    d.dot(s[3]) >= d.dot(s[0]) &&
+    d.dot(s[3]) >= d.dot(s[1]) &&
+    d.dot(s[3]) >= d.dot(s[2])
+  )
 
   const specialCase = (s1, s2) => {
     const d1 = new Vector3()
@@ -129,8 +157,7 @@ nearestSimplex[4] = function (s, d) {
     }
   } else if (bcd.dot(s[3]) <= 0) {
     if (cad.dot(s[3]) <= 0) {
-      s[2] = s[0]
-      s[0] = s.pop()
+      s[2] = s.pop()
       return nearestSimplex[3](s, d)
     } else {
       specialCase([s[0], s[1], s[3]], [s[2], s[0], s[3]])
@@ -147,20 +174,13 @@ export function gjk (
   bSupport,
   d = new Vector3(1, 0, 0),
   s = [],
-  threshold = 0.001
+  tolerance = 0.001
 ) {
   while (true) {
-    if (d.lengthSq() === 0) {
-      d.set(
-        Math.random() - Math.random(),
-        Math.random() - Math.random(),
-        Math.random() - Math.random()
-      )
-    }
     const p = aSupport(d).sub(bSupport(d.negate()))
     d.negate()
 
-    if (p.dot(d) < threshold) {
+    if (p.dot(d) < tolerance) {
       return false
     }
 
@@ -170,38 +190,128 @@ export function gjk (
     if (nearestSimplex[s.length](s, d)) {
       return true
     }
+    d.normalize()
   }
+}
+
+export function epa (
+  out,
+  aSupport,
+  bSupport,
+  triangles,
+  vertices,
+  tolerance = 0.1
+) {
+  let nearest
+  while (true) {
+    const edgeCounts = {}
+
+    const incEdge = (a, b) => {
+      const key1 = `${a},${b}`
+      const key2 = `${b},${a}`
+      if (edgeCounts[key2]) {
+        edgeCounts[key2]++
+      } else {
+        edgeCounts[key1] = (edgeCounts[key1] || 0) + 1
+      }
+    }
+
+    /* Find the closest triangle. */
+    nearest = triangles.reduce((m, x) => (
+      x.distance < m.distance ? x : m
+    ), triangles[0])
+    const a = aSupport(nearest.normal).sub(bSupport(nearest.normal.negate()))
+    nearest.normal.negate()
+
+    if (a.dot(nearest.normal) - nearest.distance > tolerance) {
+      for (let i = 0; i < triangles.length; i++) {
+        const t = triangles[i]
+        if (a.clone().sub(vertices[t.ia]).dot(t.normal) >= 0) {
+          incEdge(t.ia, t.ib)
+          incEdge(t.ib, t.ic)
+          incEdge(t.ic, t.ia)
+          /* Remove the triangle. */
+          triangles.splice(i, 1)
+          i--
+        }
+      }
+
+      /* Add the new vertex. */
+      vertices.push(a)
+
+      /* Create new faces from non-shared edges. */
+      for (const key in edgeCounts) {
+        if (edgeCounts[key] === 1) {
+          const edge = key.split(',').map(Number)
+          const tri = (
+            makeTriangle(
+              edge[0],
+              edge[1],
+              vertices.length - 1,
+              vertices
+            )
+          )
+          triangles.push(tri)
+        }
+      }
+    } else {
+      break
+    }
+  }
+  out.copy(nearest.normal).multiplyScalar(nearest.distance)
 }
 
 export function getOverlap (
   out,
   aSupport,
   bSupport,
-  initialAxis
+  initialAxis = new Vector3(1, 0, 0)
 ) {
   const s = []
-  const d = aSupport(initialAxis).sub(bSupport(initialAxis.negate()))
-  initialAxis.negate()
-  s.push(d)
-  d.negate()
+  const d = new Vector3().copy(initialAxis)
 
   if (gjk(aSupport, bSupport, d, s)) {
-    if (s.length < 4) {
-      out.set(0, 0, 0)
-    } else {
-      /* Create a triangular mesh for the simplex. */
-      const triangles = []
-      const vertices = s
+    /* Create a triangular mesh for the simplex. */
+    const triangles = []
+    const vertices = s
 
-      triangles.push(makeTriangle(0, 2, 1, vertices))
-      triangles.push(makeTriangle(0, 1, 3, vertices))
-      triangles.push(makeTriangle(1, 2, 3, vertices))
-      triangles.push(makeTriangle(2, 0, 3, vertices))
+    /* Add extra vertices if needed. */
+    if (vertices.length <= 2) {
+      let v
+      do {
+        randomizeDirection(d)
+        v = aSupport(d).sub(bSupport(d.negate()))
+        d.negate()
+      } while (vertices.find(x => x.equals(v)))
 
-      // epa(out, aSupport, bSupport, triangles, vertices, other)
+      vertices.push(v)
     }
+
+    if (vertices.length === 3) {
+      const t = makeTriangle(0, 2, 1, vertices)
+      let v = aSupport(t.normal.negate()).sub(bSupport(t.normal.negate()))
+      if (vertices.find(x => x.equals(v))) {
+        t.normal.negate()
+        vertices.unshift(vertices.pop())
+        v = aSupport(t.normal.negate()).sub(bSupport(t.normal.negate()))
+      }
+      vertices.push(v)
+    }
+
+    triangles.push(makeTriangle(0, 2, 1, vertices))
+    triangles.push(makeTriangle(0, 1, 3, vertices))
+    triangles.push(makeTriangle(1, 2, 3, vertices))
+    triangles.push(makeTriangle(2, 0, 3, vertices))
+
+    epa(out, aSupport, bSupport, triangles, vertices)
+
+    /* Remove negative zeros. */
+    out.x ||= 0.0
+    out.y ||= 0.0
+    out.z ||= 0.0
     return true
   }
+  return false
 }
 
 /**
@@ -212,7 +322,7 @@ export function sphere ({
   radius
 }) {
   const p = position ? new Vector3(...position) : new Vector3()
-  const r = radius || 1
+  const r = radius || 1.0
   return (d) => (
     d.clone().normalize().multiplyScalar(r).add(p)
   )
