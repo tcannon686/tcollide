@@ -205,7 +205,7 @@ export function epa (
   bSupport,
   triangles,
   vertices,
-  tolerance = 0.1
+  tolerance = 0.01
 ) {
   const a = new Vector3()
   const b = new Vector3()
@@ -274,6 +274,11 @@ export function epa (
   out.copy(nearest.normal).multiplyScalar(nearest.distance)
 }
 
+/**
+ * Returns true if aSupport is overlapping bSupport. Stores the amount of
+ * overlap in the vector out. In other words, after the function executes, if
+ * aSupport was moved by -out, the two shapes would no longer be colliding.
+ */
 export function getOverlap (
   out,
   aSupport,
@@ -372,4 +377,35 @@ export function box ({
       p[2] + s[2] * (d.z < 0 ? -0.5 : 0.5)
     )
   )
+}
+
+/**
+ * Returns a point support function given its position.
+ */
+export function point (x, y, z) {
+  return (d) => {
+    d.set(x, y, z)
+  }
+}
+
+/**
+ * Returns a support function that is a combination of the given support
+ * functions.
+ */
+export function hull (supports) {
+  const v = new Vector3()
+  const best = new Vector3()
+  return (d) => {
+    let bestDot = -Infinity
+    for (const f of supports) {
+      v.copy(d)
+      f(v)
+      const dot = v.dot(d)
+      if (dot > bestDot) {
+        best.copy(v)
+        bestDot = dot
+      }
+    }
+    d.copy(best)
+  }
 }

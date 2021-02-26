@@ -1,6 +1,13 @@
 /* eslint-env jest */
 
-import { gjk, sphere, box, getOverlap } from './index.js'
+import {
+  gjk,
+  sphere,
+  box,
+  point,
+  hull,
+  getOverlap
+} from './index.js'
 import { Vector3 } from 'three'
 
 test('gjk spheres', () => {
@@ -41,6 +48,9 @@ test('getOverlap spheres', () => {
   for (let i = 0; i < 10; i++) {
     for (let j = 0; j < 10; j++) {
       for (let k = 0; k < 10; k++) {
+        if (i === 5 && j === 5 && k === 5) {
+          continue
+        }
         const sphere1 = sphere({
           position: [5, 5, 5],
           radius: 5.0
@@ -63,4 +73,22 @@ test('getOverlap spheres', () => {
       }
     }
   }
+})
+
+test('getOverlap hull', () => {
+  const t = hull([point(1, 1, 0), point(-1, 1, 0), point(-1, -1, 0)])
+  const s = sphere({ position: [0, 0, 0], radius: 0.5 })
+
+  const out = new Vector3()
+  const expectedValue = new Vector3(0.5 / Math.sqrt(2), 0.5 / Math.sqrt(2), 0)
+  expect(getOverlap(out, t, s)).toBe(true)
+  expect(out.length() - expectedValue.length()).toBeLessThan(0.01)
+  expect(out.dot(new Vector3(1, -1, 0))).toBeGreaterThan(0)
+})
+
+test('getOverlap worst', () => {
+  const s = sphere({ position: [0, 0, 0], radius: 1.0 })
+  const out = new Vector3()
+  expect(getOverlap(out, s, s)).toBe(true)
+  expect(out.length() - 2.0).toBeLessThan(0.1)
 })
