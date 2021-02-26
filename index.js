@@ -409,3 +409,20 @@ export function hull (supports) {
     d.copy(best)
   }
 }
+
+/**
+ * Returns a support function that applys a transformation. It takes two
+ * functions as arguments: transform, and inverse. transform takes a vector in
+ * object space and transforms it to world space. inverse takes a direction in
+ * world space and transforms it to object space.
+ *
+ * Note that inverse should operate on a **direction**, and should not apply a
+ * translation.
+ */
+export function transform (support, transform, inverse) {
+  return (d) => {
+    inverse(d)
+    support(d)
+    transform(d)
+  }
+}
