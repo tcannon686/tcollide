@@ -1,5 +1,8 @@
-import { Vector3 } from 'three'
+import { Vector3, Matrix4 } from 'three'
 import assert from 'assert'
+import { kdTree } from './kdtree.js'
+import { Subject, BehaviorSubject } from 'rxjs'
+import { sample } from 'rxjs/operators'
 
 function makeTriangle (ia, ib, ic, vertices) {
   const ac = vertices[ic].clone().sub(vertices[ia])
@@ -210,19 +213,26 @@ export function epa (
   const a = new Vector3()
   const b = new Vector3()
 
-  let nearest
-  while (true) {
-    const edgeCounts = {}
+  const edgeCounts = new Map()
 
-    const incEdge = (a, b) => {
-      const key1 = `${a},${b}`
-      const key2 = `${b},${a}`
-      if (edgeCounts[key2]) {
-        edgeCounts[key2]++
-      } else {
-        edgeCounts[key1] = (edgeCounts[key1] || 0) + 1
-      }
+  const incEdge = (a, b) => {
+    /*
+     * Maximum safe integer is 2**53, so we shift by half of 53 to create a key.
+     * If a vertex index is greater than 2**26, we got other problems ;).
+     */
+    const key1 = a + (b * 0x4000000)
+    const key2 = b + (a * 0x4000000)
+    if (edgeCounts.has(key2)) {
+      edgeCounts.set(key2, edgeCounts.get(key2) + 1)
+    } else {
+      edgeCounts.set(key1, (edgeCounts.get(key1) || 0) + 1)
     }
+  }
+
+  let nearest
+
+  while (true) {
+    edgeCounts.clear()
 
     /* Find the closest triangle. */
     nearest = triangles.reduce((m, x) => (
@@ -253,13 +263,14 @@ export function epa (
       vertices.push(a.clone())
 
       /* Create new faces from non-shared edges. */
-      for (const key in edgeCounts) {
-        if (edgeCounts[key] === 1) {
-          const edge = key.split(',').map(Number)
+      for (const key of edgeCounts.keys()) {
+        if (edgeCounts.get(key) === 1) {
+          const e0 = key & 0x3ffffff
+          const e1 = Math.floor(key / 0x4000000)
           const tri = (
             makeTriangle(
-              edge[0],
-              edge[1],
+              e0,
+              e1,
               vertices.length - 1,
               vertices
             )
@@ -339,9 +350,9 @@ export function getOverlap (
     epa(out, aSupport, bSupport, triangles, vertices)
 
     /* Remove negative zeros. */
-    out.x ||= 0.0
-    out.y ||= 0.0
-    out.z ||= 0.0
+    out.x = out.x || 0.0
+    out.y = out.y || 0.0
+    out.z = out.z || 0.0
     return true
   }
   return false
@@ -419,10 +430,209 @@ export function hull (supports) {
  * Note that inverse should operate on a **direction**, and should not apply a
  * translation.
  */
-export function transform (support, transform, inverse) {
+export function transformable (support, transform, inverse) {
   return (d) => {
     inverse(d)
     support(d)
     transform(d)
+  }
+}
+
+/**
+ * Returns an object that can be added to the scene, built with the given
+ * support functions.
+ *
+ * The returned object looks like this:
+ * {
+ *   supports: [], // An array of support functions, each with a body field
+ *                 // pointing to the returned object.
+ *   transform: new Matrix4(), // The current transformation
+ *   update (), // Updates the objects bounding box in the scene
+ *   position, // The current position. Set the position using transform and
+ *             // then calling update().
+ *   beginOverlap, // An RxJS Subject that emits an object: { support, other,
+ *                 // amount }
+ *   endOverlap, // An RxJS Subject that emits an object: { support, other,
+ *               // amount }
+ *   isKinematic // Whether the object should be affected by physics.
+ * }
+ */
+export function body ({ supports, isKinematic }) {
+  const transform = new Matrix4()
+  const transformInverse = new Matrix4()
+  const changed = new BehaviorSubject()
+  const position = new Vector3(0, 0, 0)
+  const velocity = new Vector3(0, 0, 0)
+
+  const beginOverlap = new Subject()
+  const stayOverlap = new Subject()
+  const endOverlap = new Subject()
+
+  const ret = {
+    update () {
+      transformInverse.copy(transform)
+      transformInverse.invert()
+      position.setFromMatrixPosition(transform)
+      changed.next()
+    },
+    position,
+    transform,
+    changed,
+    beginOverlap,
+    endOverlap,
+    stayOverlap,
+    velocity,
+    isKinematic
+  }
+  ret.supports = supports.map(x => {
+    const f = transformable(
+      x,
+      (d) => {
+        d.applyMatrix4(transform)
+      },
+      (d) => {
+        d.transformDirection(transformInverse)
+      })
+    f.body = ret
+    return f
+  })
+  return ret
+}
+
+/**
+ * Returns a scene object. The scene has the following fields:
+ *  - add (bodys)
+ *  - remove (body)
+ */
+export function scene () {
+  const bodies = []
+  const dynamicBodies = []
+
+  let subscriptions = []
+  let updates = null
+
+  const gravity = new Vector3(0, -9.8, 0)
+  const onBeginOverlap = (support, other, amount) => {
+    support.body.beginOverlap.next({
+      support,
+      other,
+      amount: amount.clone()
+    })
+    other.body.beginOverlap.next({
+      support: other,
+      other: support,
+      amount: amount.clone().negate()
+    })
+  }
+  const onEndOverlap = (support, other) => {
+    support.body.endOverlap.next({
+      support,
+      other
+    })
+    other.body.endOverlap.next({
+      support: other,
+      other: support
+    })
+  }
+  const onStayOverlap = (support, other, amount) => {
+    if (support.body.stayOverlap.observers.length > 0) {
+      support.body.stayOverlap.next({
+        support,
+        other,
+        amount: amount.clone()
+      })
+    }
+    if (other.body.stayOverlap.observers.length > 0) {
+      other.body.stayOverlap.next({
+        support: other,
+        other: support,
+        amount: amount.clone().negate()
+      })
+    }
+  }
+  const normal = new Vector3()
+  const onOverlap = (a, b, amount) => {
+    if (amount.lengthSq() > 0) {
+      normal.copy(amount).normalize()
+
+      /* Handle collisions. */
+      if (!a.body.isKinematic && !b.body.isKinematic) {
+        a.body.position.addScaledVector(amount, -0.5)
+        a.body.transform.setPosition(a.body.position)
+        b.body.position.addScaledVector(amount, 0.5)
+        b.body.transform.setPosition(b.body.position)
+        a.body.update()
+        b.body.update()
+      } else if (a.body.isKinematic) {
+        b.body.position.add(amount)
+        b.body.transform.setPosition(b.body.position)
+        b.body.update()
+      } else if (b.body.isKinematic) {
+        a.body.position.addScaledVector(amount, -1.0)
+        a.body.transform.setPosition(a.body.position)
+        a.body.update()
+      }
+
+      /* Cancel velocities. */
+      if (!a.body.isKinematic) {
+        a.body.velocity.addScaledVector(normal, -a.body.velocity.dot(normal))
+      }
+      if (!b.body.isKinematic) {
+        b.body.velocity.addScaledVector(normal, -b.body.velocity.dot(normal))
+      }
+    }
+  }
+
+  const makeTree = () => (
+    kdTree(bodies.flatMap(x => x.supports), {
+      onBeginOverlap,
+      onEndOverlap,
+      onStayOverlap,
+      onOverlap
+    })
+  )
+
+  const updated = new Subject()
+
+  const updateTree = () => {
+    subscriptions.forEach(x => { x.unsubscribe() })
+    updates = makeTree()
+    subscriptions = bodies.map((x, i) => (
+      x.changed.pipe(
+        sample(updated)
+      ).subscribe(updates[i])
+    ))
+  }
+
+  let shouldUpdateTree = false
+
+  return {
+    add (body) {
+      if (!body.isKinematic) {
+        dynamicBodies.push(body)
+      }
+      bodies.push(body)
+      shouldUpdateTree = true
+    },
+    remove (body) {
+      if (!body.isKinematic) {
+        dynamicBodies.splice(dynamicBodies.indexOf(body), 1)
+      }
+      bodies.splice(bodies.indexOf(body), 1)
+      shouldUpdateTree = true
+    },
+    update (dt) {
+      if (shouldUpdateTree) {
+        updateTree()
+        shouldUpdateTree = false
+      }
+      dynamicBodies.forEach(body => {
+        body.position.addScaledVector(body.velocity, dt || 0.0)
+        body.velocity.addScaledVector(gravity, dt || 0.0)
+        body.transform.setPosition(body.position)
+        body.update()
+      })
+      updated.next()
+    }
   }
 }

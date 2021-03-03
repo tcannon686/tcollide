@@ -6,9 +6,12 @@ import {
   box,
   point,
   hull,
-  getOverlap
+  getOverlap,
+  transformable,
+  scene,
+  body
 } from './index.js'
-import { Vector3 } from 'three'
+import { Vector3, Matrix4 } from 'three'
 
 test('gjk spheres', () => {
   for (let i = 0; i < 10; i++) {
@@ -37,8 +40,36 @@ test('gjk boxes', () => {
 })
 
 test('getOverlap boxes', () => {
+  {
+    const box1 = box({})
+    const box2 = box({ position: [0.0, 0.45, 0] })
+    const out = new Vector3()
+    expect(getOverlap(out, box1, box2)).toBe(true)
+    expect(out.toArray()).toEqual([0, 0.55, 0])
+  }
+
+  {
+    const box1 = box({})
+    const box2 = box({})
+    const out = new Vector3()
+    expect(getOverlap(out, box1, box2)).toBe(true)
+    expect(out.length()).toBeGreaterThanOrEqual(1.0)
+  }
+})
+
+test('getOverlap transformable', () => {
+  const transform = new Matrix4().makeTranslation(0, 0.45, 0)
+  const transformInverse = new Matrix4().copy(transform).invert()
   const box1 = box({})
-  const box2 = box({ position: [0.0, 0.45, 0] })
+  const box2 = transformable(
+    box({}),
+    d => {
+      d.applyMatrix4(transform)
+    },
+    d => {
+      d.transformDirection(transformInverse)
+    }
+  )
   const out = new Vector3()
   expect(getOverlap(out, box1, box2)).toBe(true)
   expect(out.toArray()).toEqual([0, 0.55, 0])
@@ -91,4 +122,37 @@ test('getOverlap worst', () => {
   const out = new Vector3()
   expect(getOverlap(out, s, s)).toBe(true)
   expect(out.length() - 2.0).toBeLessThan(0.1)
+})
+
+test('scene', () => {
+  const s = scene()
+  const b = body({
+    supports: [box({})]
+  })
+  const c = body({
+    supports: [box({ position: [0.25, 0, 0] })]
+  })
+  const d = body({
+    supports: [box({ position: [0.5, 0, 0] })]
+  })
+
+  let bBeginOverlapCount = 0
+  let cBeginOverlapCount = 0
+
+  b.beginOverlap.subscribe(({ other, amount }) => {
+    expect(other.body).toBe(c)
+    bBeginOverlapCount++
+  })
+  c.beginOverlap.subscribe(({ other, amount }) => {
+    expect(other.body).toBe(b)
+    cBeginOverlapCount++
+  })
+  s.add(b)
+  s.add(c)
+  s.add(d)
+
+  s.update()
+
+  expect(bBeginOverlapCount).toBeGreaterThan(0)
+  expect(cBeginOverlapCount).toBeGreaterThan(0)
 })
