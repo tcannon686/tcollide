@@ -9,7 +9,9 @@ function makeTriangle (ia, ib, ic, vertices) {
   const bc = vertices[ic].clone().sub(vertices[ib])
   const normal = ac.cross(bc)
 
-  assert(normal.lengthSq() !== 0)
+  if (normal.lengthSq() === 0) {
+    return null
+  }
   normal.normalize()
 
   const distance = normal.dot(vertices[ic])
@@ -237,7 +239,7 @@ export function epa (
     /* Find the closest triangle. */
     nearest = triangles.reduce((m, x) => (
       x.distance < m.distance ? x : m
-    ), triangles[0])
+    ))
 
     a.copy(nearest.normal)
     b.copy(nearest.normal)
@@ -275,6 +277,11 @@ export function epa (
               vertices
             )
           )
+          /* If we somehow get a triangle with zero area, break. */
+          if (!tri) {
+            out.copy(nearest.normal).multiplyScalar(nearest.distance)
+            return
+          }
           triangles.push(tri)
         }
       }

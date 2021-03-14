@@ -50,6 +50,14 @@ test('getOverlap boxes', () => {
 
   {
     const box1 = box({})
+    const box2 = box({ position: [0.0, 1.0, 0] })
+    const out = new Vector3()
+    expect(getOverlap(out, box1, box2)).toBe(true)
+    expect(out.toArray()).toEqual([0, 0, 0])
+  }
+
+  {
+    const box1 = box({})
     const box2 = box({})
     const out = new Vector3()
     expect(getOverlap(out, box1, box2)).toBe(true)
