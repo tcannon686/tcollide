@@ -115,7 +115,7 @@ test('getOverlap spheres', () => {
 })
 
 test('getOverlap hull', () => {
-  const t = hull([point(1, 1, 0), point(-1, 1, 0), point(-1, -1, 0)])
+  const t = hull(point(1, 1, 0), point(-1, 1, 0), point(-1, -1, 0))
   const s = sphere({ position: [0, 0, 0], radius: 0.5 })
 
   const out = new Vector3()

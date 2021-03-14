@@ -375,7 +375,24 @@ export function sphere ({
   const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
   const r = radius || 1.0
   return (d) => (
-    d.normalize().multiplyScalar(r).add(p)
+    d.multiplyScalar(r).add(p)
+  )
+}
+
+/**
+ * Returns a circle support function given the position, radius, and axis, where
+ * axis is an array representing the normal of the circle.
+ */
+export function circle ({
+  position,
+  radius,
+  axis
+}) {
+  const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
+  const a = axis ? new Vector3(...axis) : new Vector3(0, 1, 0)
+  const r = radius || 1.0
+  return (d) => (
+    d.addScaledVector(a, -d.dot(a)).multiplyScalar(r).add(p)
   )
 }
 
@@ -410,7 +427,7 @@ export function point (x, y, z) {
  * Returns a support function that is a combination of the given support
  * functions.
  */
-export function hull (supports) {
+export function hull (...supports) {
   const v = new Vector3()
   const best = new Vector3()
   return (d) => {
