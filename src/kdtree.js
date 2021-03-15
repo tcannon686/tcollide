@@ -1,5 +1,5 @@
 import { Vector3 } from 'three'
-import { getOverlap } from './index.js'
+import { getOverlap } from './gjk.js'
 
 const axes = ['x', 'y', 'z']
 
