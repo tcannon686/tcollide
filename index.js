@@ -142,12 +142,16 @@ export function scene () {
         a.body.update()
       }
 
-      /* Cancel velocities. */
+      /* Adjust velocities. */
       if (!a.body.isKinematic) {
         a.body.velocity.addScaledVector(normal, -a.body.velocity.dot(normal))
+        /* Apply friction. TODO change constant. */
+        a.body.velocity.addScaledVector(a.body.velocity, -0.1)
       }
       if (!b.body.isKinematic) {
         b.body.velocity.addScaledVector(normal, -b.body.velocity.dot(normal))
+        /* Apply friction. TODO change constant. */
+        b.body.velocity.addScaledVector(b.body.velocity, -0.1)
       }
     }
   }
