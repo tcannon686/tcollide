@@ -132,11 +132,11 @@ export function scene () {
         b.body.transform.setPosition(b.body.position)
         a.body.update()
         b.body.update()
-      } else if (a.body.isKinematic) {
+      } else if (!b.body.isKinematic) {
         b.body.position.add(amount)
         b.body.transform.setPosition(b.body.position)
         b.body.update()
-      } else if (b.body.isKinematic) {
+      } else if (!a.body.isKinematic) {
         a.body.position.addScaledVector(amount, -1.0)
         a.body.transform.setPosition(a.body.position)
         a.body.update()
