@@ -87,7 +87,7 @@ export function body ({ supports, isKinematic }) {
  *  - overlapped - RxJS Subject that emits { support, other, amount } when two
  *                 objects overlap.
  */
-export function collisionScene () {
+export function collisionScene ({}) {
   const bodies = []
   let subscriptions = []
   let updates = null
@@ -188,10 +188,10 @@ export function collisionScene () {
  *  - remove (body)
  *  - update (dt)
  */
-export function scene () {
-  const cScene = collisionScene()
+export function scene ({ gravity }) {
+  const cScene = collisionScene({})
   const dynamicBodies = []
-  const gravity = new Vector3(0, -9.8, 0)
+  gravity = new Vector3(...(gravity || [0, -9.8, 0]))
 
   const normal = new Vector3()
   const onOverlap = ({ support, other, amount }) => {
