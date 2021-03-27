@@ -9,7 +9,9 @@ export * from './src/shapes'
 
 /**
  * Returns an object that can be added to the scene, built with the given
- * support functions.
+ * support functions. For each supplied support function, a new support function
+ * is created, with an additional `body` field, which points to the returned
+ * body.
  *
  * The returned object looks like this:
  * {
@@ -69,18 +71,33 @@ export function body ({ supports, isKinematic }) {
 }
 
 /**
- * Returns a scene object. The scene has the following fields:
+ * Returns a scene object. The scene efficiently handles collisions for multiple
+ * bodies, and supports the overlap events for bodies.
+ *
+ * To check for overlaps, call the update() method of the returned scene object.
+ * This will then emit the beginOverlap, endOverlap, and stayOverlap subjects
+ * for each body that overlaps another body. It also has a `overlapped` subject,
+ * which emits an object { support, other, amount } when two bodies overlap.
+ * This object is emitted only once per pair.
+ *
+ * The scene has the following fields:
  *  - add (bodys)
  *  - remove (body)
+ *  - update ()
+ *  - overlapped - RxJS Subject that emits { support, other, amount } when two
+ *                 objects overlap.
  */
-export function scene () {
+export function collisionScene () {
   const bodies = []
-  const dynamicBodies = []
-
   let subscriptions = []
   let updates = null
 
-  const gravity = new Vector3(0, -9.8, 0)
+  const overlapped = new Subject()
+  
+  const onOverlap = (support, other, amount) => {
+    overlapped.next({ support, other, amount })
+  }
+
   const onBeginOverlap = (support, other, amount) => {
     support.body.beginOverlap.next({
       support,
@@ -119,8 +136,67 @@ export function scene () {
       })
     }
   }
+
+  const makeTree = () => (
+    kdTree(bodies.flatMap(x => x.supports), {
+      onBeginOverlap,
+      onEndOverlap,
+      onStayOverlap,
+      onOverlap
+    })
+  )
+
+  const updated = new Subject()
+
+  const updateTree = () => {
+    subscriptions.forEach(x => { x.unsubscribe() })
+    updates = makeTree()
+    subscriptions = bodies.map((x, i) => (
+      x.changed.pipe(
+        sample(updated)
+      ).subscribe(updates[i])
+    ))
+  }
+
+  let shouldUpdateTree = false
+
+  return {
+    add (body) {
+      bodies.push(body)
+      shouldUpdateTree = true
+    },
+    remove (body) {
+      bodies.splice(bodies.indexOf(body), 1)
+      shouldUpdateTree = true
+    },
+    update () {
+      if (shouldUpdateTree) {
+        updateTree()
+        shouldUpdateTree = false
+      }
+      updated.next()
+    },
+    overlapped
+  }
+}
+
+/**
+ * Creates a scene with very basic physics.
+ *
+ * The returned object has the following fields:
+ *  - add (body)
+ *  - remove (body)
+ *  - update (dt)
+ */
+export function scene () {
+  const cScene = collisionScene()
+  const dynamicBodies = []
+  const gravity = new Vector3(0, -9.8, 0)
+
   const normal = new Vector3()
-  const onOverlap = (a, b, amount) => {
+  const onOverlap = ({ support, other, amount }) => {
+    const a = support
+    const b = other
     if (amount.lengthSq() > 0) {
       normal.copy(amount).normalize()
 
@@ -156,56 +232,29 @@ export function scene () {
     }
   }
 
-  const makeTree = () => (
-    kdTree(bodies.flatMap(x => x.supports), {
-      onBeginOverlap,
-      onEndOverlap,
-      onStayOverlap,
-      onOverlap
-    })
-  )
-
-  const updated = new Subject()
-
-  const updateTree = () => {
-    subscriptions.forEach(x => { x.unsubscribe() })
-    updates = makeTree()
-    subscriptions = bodies.map((x, i) => (
-      x.changed.pipe(
-        sample(updated)
-      ).subscribe(updates[i])
-    ))
-  }
-
-  let shouldUpdateTree = false
+  cScene.overlapped.subscribe(onOverlap)
 
   return {
     add (body) {
       if (!body.isKinematic) {
         dynamicBodies.push(body)
       }
-      bodies.push(body)
-      shouldUpdateTree = true
+      cScene.add(body)
     },
     remove (body) {
       if (!body.isKinematic) {
         dynamicBodies.splice(dynamicBodies.indexOf(body), 1)
       }
-      bodies.splice(bodies.indexOf(body), 1)
-      shouldUpdateTree = true
+      cScene.remove(body)
     },
     update (dt) {
-      if (shouldUpdateTree) {
-        updateTree()
-        shouldUpdateTree = false
-      }
       dynamicBodies.forEach(body => {
         body.position.addScaledVector(body.velocity, dt || 0.0)
         body.velocity.addScaledVector(gravity, dt || 0.0)
         body.transform.setPosition(body.position)
         body.update()
       })
-      updated.next()
+      cScene.update()
     }
   }
 }
