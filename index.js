@@ -1,4 +1,4 @@
-import { Vector3, Matrix4 } from 'three'
+import { Vector3, Matrix4, Matrix3 } from 'three'
 import { kdTree } from './src/kdtree.js'
 import { Subject, BehaviorSubject } from 'rxjs'
 import { sample } from 'rxjs/operators'
@@ -28,7 +28,7 @@ export * from './src/shapes'
  */
 export function body ({ supports, isKinematic }) {
   const transform = new Matrix4()
-  const transformInverse = new Matrix4()
+  const transformInverse = new Matrix3()
   const changed = new BehaviorSubject()
   const position = new Vector3(0, 0, 0)
   const velocity = new Vector3(0, 0, 0)
@@ -39,8 +39,8 @@ export function body ({ supports, isKinematic }) {
 
   const ret = {
     update () {
-      transformInverse.copy(transform)
-      transformInverse.invert()
+      transformInverse.setFromMatrix4(transform)
+      transformInverse.transpose()
       position.setFromMatrixPosition(transform)
       changed.next()
     },
@@ -60,7 +60,7 @@ export function body ({ supports, isKinematic }) {
         d.applyMatrix4(transform)
       },
       (d) => {
-        d.transformDirection(transformInverse)
+        d.applyMatrix3(transformInverse)
       })
     f.body = ret
     return f

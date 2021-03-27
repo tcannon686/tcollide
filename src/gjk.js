@@ -172,6 +172,7 @@ export function gjk (
   const a = new Vector3()
   const b = new Vector3()
   while (true) {
+    d.normalize()
     a.copy(d)
     b.copy(d).negate()
     aSupport(a)
@@ -188,7 +189,6 @@ export function gjk (
     if (nearestSimplex[s.length](s, d)) {
       return true
     }
-    d.normalize()
   }
 }
 

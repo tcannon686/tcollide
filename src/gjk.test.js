@@ -10,6 +10,7 @@ import {
   box,
   point,
   hull,
+  circle,
   transformable
 } from './shapes.js'
 
@@ -132,4 +133,20 @@ test('gjk spheres', () => {
       }
     }
   }
+})
+
+test('gjk cylinders', () => {
+  const cylinder1 = hull(
+    circle({}),
+    circle({ position: [0, 1, 0] })
+  )
+  const cylinder2 = hull(
+    circle({ position: [-1.95, 0.975, 0] }),
+    circle({ position: [-1.95, 0.975 + 1, 0] })
+  )
+  const out = new Vector3()
+  expect(gjk(cylinder1, cylinder2)).toBe(true)
+  expect(getOverlap(out, cylinder1, cylinder2)).toBe(true)
+  expect(out.lengthSq()).toBeGreaterThan(0)
+  console.log(out)
 })

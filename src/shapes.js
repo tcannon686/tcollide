@@ -27,7 +27,7 @@ export function circle ({
   const a = axis ? new Vector3(...axis) : new Vector3(0, 1, 0)
   const r = radius || 1.0
   return (d) => (
-    d.addScaledVector(a, -d.dot(a)).multiplyScalar(r).add(p)
+    d.addScaledVector(a, -d.dot(a)).normalize().multiplyScalar(r).add(p)
   )
 }
 
