@@ -1,6 +1,6 @@
 {
-  "name": "collide",
-  "version": "1.0.0",
+  "name": "tcollide",
+  "version": "0.1.0",
   "description": "A simple collision detection library for three.js",
   "type": "module",
   "main": "index.js",
