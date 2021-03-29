@@ -81,6 +81,23 @@ export function hull (...supports) {
 }
 
 /**
+ * Returns a support function that is the Minkowski sum of the given functions.
+ */
+export function sum (...supports) {
+  const v = new Vector3()
+  const t = new Vector3()
+  return (d) => {
+    t.set(0, 0, 0)
+    for (const f of supports) {
+      v.copy(d)
+      f(v)
+      t.add(v)
+    }
+    d.copy(t)
+  }
+}
+
+/**
  * Returns a support function that applys a transformation. It takes two
  * functions as arguments: transform, and inverse. transform takes a vector in
  * object space and transforms it to world space. inverse takes a direction in
