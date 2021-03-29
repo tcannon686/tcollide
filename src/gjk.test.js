@@ -148,5 +148,4 @@ test('gjk cylinders', () => {
   expect(gjk(cylinder1, cylinder2)).toBe(true)
   expect(getOverlap(out, cylinder1, cylinder2)).toBe(true)
   expect(out.lengthSq()).toBeGreaterThan(0)
-  console.log(out)
 })

@@ -7,7 +7,7 @@ import {
 } from './index.js'
 
 test('scene', () => {
-  const s = scene()
+  const s = scene({})
   const b = body({
     supports: [box({})]
   })
