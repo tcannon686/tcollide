@@ -135,6 +135,26 @@ export function sum (...supports) {
 }
 
 /**
+ * Returns a support function that uses a when the dot product with d is greater
+ * than or equal to zero, and b when the dot product is less than zero. This can
+ * be used to create shapes such as a hemisphere.
+ *
+ * @param {Support} a - The "top" support
+ * @param {Support} b - The "bottom" support
+ * @param {Number[]} d - The direction (default up)
+ */
+export function split (a, b, d = [0, 1, 0]) {
+  const v = new Vector3(...d)
+  return (d) => {
+    if (v.dot(d) >= 0) {
+      a(d)
+    } else {
+      b(d)
+    }
+  }
+}
+
+/**
  * Returns a support function that applys a transformation. It takes two
  * functions as arguments: transform, and inverse. transform takes a vector in
  * object space and transforms it to world space. inverse takes a direction in
