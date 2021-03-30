@@ -280,7 +280,7 @@ export function epa (
   out.copy(nearest.normal).multiplyScalar(nearest.distance)
 }
 
-/**
+/*
  * Returns true if aSupport is overlapping bSupport. Stores the amount of
  * overlap in the vector out. In other words, after the function executes, if
  * aSupport was moved by -out, the two shapes would no longer be colliding.

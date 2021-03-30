@@ -8,25 +8,47 @@ import { transformable } from './src/shapes'
 export * from './src/shapes'
 
 /**
+ * @property {Vector3} amount
+ * @property {BodySupport} support
+ * @property {BodySupport} other
+ * @typedef {Object} OverlapInfo
+ */
+
+/**
+ * A Support that is paired with a body.
+ *
+ * @property {Body} body
+ * @typedef {Support} BodySupport
+ */
+
+/**
+ * A transformable collection of shapes.
+ *
+ * @typedef {Object} Body
+ * @property {BodySupport[]} supports - An array of support functions, each
+ *                                      with a body field pointing to the
+ *                                      returned object
+ * @property {Matrix4} transform - The current transformation
+ * @property {Function} update - Updates the objects bounding box in the scene
+ * @property {Vector3} position - The current position. Set the position using
+ *                                transform and then calling update()
+ * @property {Vector3} velocity - The current velocity
+ * @property {Subject} beginOverlap - An RxJS Subject that emits an OverlapInfo
+ *                                    object
+ * @property {Subject} endOverlap - An RxJS Subject that emits an OverlapInfo object
+ * @property {Subject} isKinematic - Whether the object should be affected by physics
+ */
+
+/**
  * Returns an object that can be added to the scene, built with the given
  * support functions. For each supplied support function, a new support function
  * is created, with an additional `body` field, which points to the returned
  * body.
  *
- * The returned object looks like this:
- * {
- *   supports: [], // An array of support functions, each with a body field
- *                 // pointing to the returned object.
- *   transform: new Matrix4(), // The current transformation
- *   update (), // Updates the objects bounding box in the scene
- *   position, // The current position. Set the position using transform and
- *             // then calling update().
- *   beginOverlap, // An RxJS Subject that emits an object: { support, other,
- *                 // amount }
- *   endOverlap, // An RxJS Subject that emits an object: { support, other,
- *               // amount }
- *   isKinematic // Whether the object should be affected by physics.
- * }
+ * @param {Support[]} props.supports - A set of support functions.
+ * @param {Boolean} props.isKinematic - Whether the body should move based on
+ *                                      the physics simulation or not.
+ * @returns {Body}
  */
 export function body ({ supports, isKinematic }) {
   const transform = new Matrix4()
@@ -71,21 +93,25 @@ export function body ({ supports, isKinematic }) {
 }
 
 /**
+ * @property {Function} add - Add a body to the scene
+ * @property {Function} remove - Remove a body from the scene
+ * @property {Function} update - Update the scene, trigger events
+ * @property {Subject} overlapped - RxJS Subject that emits an OverlapInfo
+ *                                  object when two objects overlap.
+ * @typedef CollisionScene
+ */
+
+/**
  * Returns a scene object. The scene efficiently handles collisions for multiple
  * bodies, and supports the overlap events for bodies.
  *
  * To check for overlaps, call the update() method of the returned scene object.
  * This will then emit the beginOverlap, endOverlap, and stayOverlap subjects
  * for each body that overlaps another body. It also has a `overlapped` subject,
- * which emits an object { support, other, amount } when two bodies overlap.
- * This object is emitted only once per pair.
+ * which emits an OverlapInfo object when two bodies overlap. This object is
+ * emitted only once per pair.
  *
- * The scene has the following fields:
- *  - add (bodys)
- *  - remove (body)
- *  - update ()
- *  - overlapped - RxJS Subject that emits { support, other, amount } when two
- *                 objects overlap.
+ * @returns {CollisionScene}
  */
 export function collisionScene ({}) {
   const bodies = []
@@ -181,12 +207,17 @@ export function collisionScene ({}) {
 }
 
 /**
+ * @property {Function} add - Add a Body to the scene
+ * @property {Function} remove - Remove a Body from the scene
+ * @property {Function} update - Update the scene given dt, the delta time in
+ *                               seconds
+ * @typedef Scene
+ */
+
+/**
  * Creates a scene with very basic physics.
  *
- * The returned object has the following fields:
- *  - add (body)
- *  - remove (body)
- *  - update (dt)
+ * @returns {Scene}
  */
 export function scene ({ gravity }) {
   const cScene = collisionScene({})

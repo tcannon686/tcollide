@@ -15,7 +15,7 @@ function overlaps (left, right) {
   return true
 }
 
-/**
+/*
  * Returns a bounding box for the given support function. The bounding box is an
  * object that looks like this:
  *
@@ -181,7 +181,7 @@ function innerNode (nodes, axisIndex = 0) {
   return ret
 }
 
-/**
+/*
  * Creates a kdTree given a set of supports and a set of callbacks. Returns an
  * array of functions that can be used to update each object. The callbacks
  * object may contain three methods: onBeginOverlap(support, other, amount),
