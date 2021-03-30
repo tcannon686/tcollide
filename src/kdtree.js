@@ -189,10 +189,11 @@ function innerNode (nodes, axisIndex = 0) {
  * and onOverlap(support, other, amount). If any overlap occurs, onOverlap is
  * called, followed by onBeginOverlap or onEndOverlap.
  */
-export function kdTree (supports, callbacks) {
+export function kdTree (supports, callbacks, tolerance) {
   const currentlyOverlapping = new Map()
   const visited = new Set()
   const out = new Vector3()
+  const initialAxis = new Vector3(1, 0, 0)
   const dfs = (node, tree) => {
     if (tree) {
       if (overlaps(node, tree)) {
@@ -202,7 +203,7 @@ export function kdTree (supports, callbacks) {
           if (!currentlyOverlapping.has(support)) {
             currentlyOverlapping.set(support, new Set())
           }
-          if (getOverlap(out, support, other)) {
+          if (getOverlap(out, support, other, initialAxis, tolerance)) {
             if (!currentlyOverlapping.has(other)) {
               currentlyOverlapping.set(other, new Set())
             }

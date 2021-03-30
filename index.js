@@ -111,9 +111,13 @@ export function body ({ supports, isKinematic }) {
  * which emits an OverlapInfo object when two bodies overlap. This object is
  * emitted only once per pair.
  *
+ * @param {Number} props.tolerance - Tolerance for GJK and EPA algorithms.
+ *                                   Reduce this number to increase precision
+ *                                   (default 0.001)
  * @returns {CollisionScene}
  */
-export function collisionScene ({}) {
+export function collisionScene ({ tolerance }) {
+  tolerance = tolerance || 0.001
   const bodies = []
   let subscriptions = []
   let updates = null
@@ -169,7 +173,8 @@ export function collisionScene ({}) {
       onEndOverlap,
       onStayOverlap,
       onOverlap
-    })
+    },
+    tolerance)
   )
 
   const updated = new Subject()
@@ -217,10 +222,15 @@ export function collisionScene ({}) {
 /**
  * Creates a scene with very basic physics.
  *
+ * @param {Number[]} props.gravity - Acceleration due to gravity
+ *                                  (default [0, -9.8, 0])
+ * @param {Number} props.tolerance - Tolerance for GJK and EPA algorithms.
+ *                                   Reduce this number to increase precision
+ *                                   (default 0.001)
  * @returns {Scene}
  */
-export function scene ({ gravity }) {
-  const cScene = collisionScene({})
+export function scene ({ gravity, tolerance }) {
+  const cScene = collisionScene({ tolerance })
   const dynamicBodies = []
   gravity = new Vector3(...(gravity || [0, -9.8, 0]))
 

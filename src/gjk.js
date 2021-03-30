@@ -198,7 +198,7 @@ export function epa (
   bSupport,
   triangles,
   vertices,
-  tolerance = 0.01
+  tolerance = 0.001
 ) {
   const a = new Vector3()
   const b = new Vector3()
@@ -289,12 +289,13 @@ export function getOverlap (
   out,
   aSupport,
   bSupport,
-  initialAxis = new Vector3(1, 0, 0)
+  initialAxis = new Vector3(1, 0, 0),
+  tolerance = 0.001
 ) {
   const s = []
   const d = new Vector3().copy(initialAxis)
 
-  if (gjk(aSupport, bSupport, d, s)) {
+  if (gjk(aSupport, bSupport, d, s, tolerance)) {
     /* Create a triangular mesh for the simplex. */
     const triangles = []
     const vertices = s
