@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { getOverlap } from './gjk.js'
+import { quickselect } from './quickselect.js'
 
 const axes = ['x', 'y', 'z']
 
@@ -27,7 +28,7 @@ function overlaps (left, right) {
  *   onUpdate(), // Called when update is called
  * }
  */
-export function leafNode (support, onUpdate) {
+function leafNode (support, onUpdate) {
   const min = new Vector3()
   const max = new Vector3()
   const origin = new Vector3()
@@ -79,7 +80,6 @@ function innerNode (nodes, axisIndex = 0) {
   }
 
   const axisName = axes[axisIndex]
-  const index = Math.floor(nodes.length / 2)
 
   const firstMin = new Vector3()
   const firstMax = new Vector3()
@@ -135,14 +135,31 @@ function innerNode (nodes, axisIndex = 0) {
   }
 
   const generate = () => {
-    nodes.sort((a, b) => b.origin[axisName] - a.origin[axisName])
-    ret.node = nodes[index]
-    ret.node.parent = ret
-    ret.left = innerNode(nodes.slice(0, index), (axisIndex + 1) % axes.length)
+    /* Find the median. */
+    const k = Math.floor(nodes.length / 2)
+    const node = quickselect(nodes, k, (a, b) => b.origin[axisName] - a.origin[axisName])
+    const leftNodes = []
+    const rightNodes = []
+    const index = nodes.indexOf(node)
+
+    /* Partition based on the median. */
+    for (let i = 0; i < nodes.length; i++) {
+      if (i !== index) {
+        if (nodes[i].origin[axisName] < node.origin[axisName]) {
+          leftNodes.push(nodes[i])
+        } else {
+          rightNodes.push(nodes[i])
+        }
+      }
+    }
+
+    node.parent = ret
+    ret.node = node
+    ret.left = innerNode(leftNodes, (axisIndex + 1) % axes.length)
     if (ret.left) {
       ret.left.parent = ret
     }
-    ret.right = innerNode(nodes.slice(index + 1), (axisIndex + 1) % axes.length)
+    ret.right = innerNode(rightNodes, (axisIndex + 1) % axes.length)
     if (ret.right) {
       ret.right.parent = ret
     }

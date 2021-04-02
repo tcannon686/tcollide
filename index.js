@@ -123,7 +123,7 @@ export function collisionScene ({ tolerance }) {
   let updates = null
 
   const overlapped = new Subject()
-  
+
   const onOverlap = (support, other, amount) => {
     overlapped.next({ support, other, amount })
   }
