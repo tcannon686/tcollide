@@ -140,11 +140,10 @@ function innerNode (nodes, axisIndex = 0) {
     const node = quickselect(nodes, k, (a, b) => b.origin[axisName] - a.origin[axisName])
     const leftNodes = []
     const rightNodes = []
-    const index = nodes.indexOf(node)
 
     /* Partition based on the median. */
     for (let i = 0; i < nodes.length; i++) {
-      if (i !== index) {
+      if (nodes[i] !== node) {
         if (nodes[i].origin[axisName] < node.origin[axisName]) {
           leftNodes.push(nodes[i])
         } else {
@@ -186,7 +185,7 @@ function innerNode (nodes, axisIndex = 0) {
       return true
     } else {
       if (ret.parent) {
-        ret.parent.update()
+        return ret.parent.update()
       }
     }
   }
