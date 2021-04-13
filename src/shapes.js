@@ -1,5 +1,52 @@
 import { Vector3 } from 'three'
 
+/* Error checking. */
+function validateVector (msg, v) {
+  if (!Array.isArray(v)) {
+    throw new Error(msg + ': expected Number[] but got ' + v)
+  }
+  if (v.some(x => typeof x !== 'number')) {
+    throw new Error(msg + ': expected Number[] but got ' + v)
+  }
+}
+
+function validatePositiveVector (msg, v) {
+  validateVector(msg, v)
+  if (v.some(x => x <= 0)) {
+    throw new Error(msg + ': expected positive Number[] but got ' + v)
+  }
+}
+
+function validateNumber (msg, v) {
+  if (typeof v !== 'number') {
+    throw new Error(msg + ': expected Number but got ' + v)
+  }
+}
+
+function validatePositive (msg, v) {
+  if (v <= 0) {
+    throw new Error(msg + ': expected positive Number but got ' + v)
+  }
+}
+
+function validateOptional (msg, v, f) {
+  if (v !== undefined) {
+    f(msg, v)
+  }
+}
+
+function validateFunction (msg, v) {
+  if (typeof v !== 'function') {
+    throw new Error(msg + ': expected Function but got ' + v)
+  }
+}
+
+function validateSupport (msg, v) {
+  if (typeof v !== 'function') {
+    throw new Error(msg + ': expected support Function but got ' + v)
+  }
+}
+
 /**
  * A function that returns the point with the highest dot product with the given
  * direction on a shape.
@@ -20,8 +67,12 @@ export function sphere ({
   position,
   radius
 }) {
+  validateOptional('sphere', position, validateVector)
+  validateOptional('sphere', radius, validatePositive)
+
   const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
   const r = radius || 1.0
+
   return (d) => (
     d.multiplyScalar(r).add(p)
   )
@@ -42,6 +93,10 @@ export function circle ({
   radius,
   axis
 }) {
+  validateOptional('circle', position, validateVector)
+  validateOptional('circle', axis, validateVector)
+  validateOptional('circle', radius, validatePositive)
+
   const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
   const a = axis ? new Vector3(...axis) : new Vector3(0, 1, 0)
   const r = radius || 1.0
@@ -63,6 +118,9 @@ export function box ({
   position,
   size
 }) {
+  validateOptional('box', position, validateVector)
+  validateOptional('box', size, validatePositiveVector)
+
   const p = position || [0, 0, 0]
   const s = size || [1, 1, 1]
   return (d) => (
@@ -83,6 +141,10 @@ export function box ({
  * @returns {Support}
  */
 export function point (x, y, z) {
+  validateNumber('point', x)
+  validateNumber('point', y)
+  validateNumber('point', z)
+
   return (d) => {
     d.set(x, y, z)
   }
@@ -99,6 +161,11 @@ export function point (x, y, z) {
 export function hull (...supports) {
   const v = new Vector3()
   const best = new Vector3()
+
+  for (const f of supports) {
+    validateSupport('hull', f)
+  }
+
   return (d) => {
     let bestDot = -Infinity
     for (const f of supports) {
@@ -123,6 +190,11 @@ export function hull (...supports) {
 export function sum (...supports) {
   const v = new Vector3()
   const t = new Vector3()
+
+  for (const f of supports) {
+    validateSupport('sum', f)
+  }
+
   return (d) => {
     t.set(0, 0, 0)
     for (const f of supports) {
@@ -144,6 +216,10 @@ export function sum (...supports) {
  * @param {Number[]} d - The direction (default up)
  */
 export function split (a, b, d = [0, 1, 0]) {
+  validateSupport('split', a)
+  validateSupport('split', b)
+  validateVector('split', d)
+
   const v = new Vector3(...d)
   return (d) => {
     if (v.dot(d) >= 0) {
@@ -171,6 +247,10 @@ export function split (a, b, d = [0, 1, 0]) {
  * @returns {Support}
  */
 export function transformable (support, transform, inverse) {
+  validateSupport('transformable', support)
+  validateFunction('transformable', transform)
+  validateFunction('transformable', inverse)
+
   return (d) => {
     inverse(d)
     support(d)
