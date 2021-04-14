@@ -73,6 +73,7 @@ function leafNode (support, onUpdate) {
 }
 
 function InnerNode (nodes, axisIndex) {
+  this.axisIndex = axisIndex
   this.axisName = axes[axisIndex]
   this.firstMin = new Vector3()
   this.firstMax = new Vector3()
@@ -197,6 +198,84 @@ function innerNode (nodes, axisIndex = 0) {
   return new InnerNode(nodes, axisIndex)
 }
 
+function KdTree (supports, callbacks, tolerance) {
+  this.callbacks = callbacks
+  this.tolerance = tolerance
+  this.currentlyOverlapping = new Map()
+  this.visited = new Set()
+  this.out = new Vector3()
+  this.initialAxis = new Vector3(1, 0, 0)
+
+  this.nodes = supports.map(x => leafNode(
+    x,
+    (x) => this.handleUpdate(x)
+  ))
+
+  this.root = innerNode(this.nodes)
+}
+
+KdTree.prototype.dfs = function (node, tree, out) {
+  if (tree) {
+    if (overlaps(node, tree)) {
+      if (node !== tree.node && overlaps(node, tree.node)) {
+        const support = node.support
+        const other = tree.node.support
+        if (!this.currentlyOverlapping.has(support)) {
+          this.currentlyOverlapping.set(support, new Set())
+        }
+        if (
+          getOverlap(
+            out,
+            support,
+            other,
+            this.initialAxis,
+            this.tolerance)
+        ) {
+          if (!this.currentlyOverlapping.has(other)) {
+            this.currentlyOverlapping.set(other, new Set())
+          }
+          const supportSet = this.currentlyOverlapping.get(support)
+          const otherSet = this.currentlyOverlapping.get(other)
+
+          if (this.callbacks.onOverlap) {
+            this.callbacks.onOverlap(support, other, out)
+          }
+
+          if (!supportSet.has(other)) {
+            supportSet.add(other)
+            otherSet.add(support)
+            if (this.callbacks.onBeginOverlap) {
+              this.callbacks.onBeginOverlap(support, other, out)
+            }
+          } else {
+            if (this.callbacks.onStayOverlap) {
+              this.callbacks.onStayOverlap(support, other, out)
+            }
+          }
+          this.visited.add(other)
+        }
+      }
+      this.dfs(node, tree.left, out)
+      this.dfs(node, tree.right, out)
+    }
+  }
+}
+
+KdTree.prototype.handleUpdate = function (node) {
+  this.visited.clear()
+  this.dfs(node, this.root, this.out)
+  const set = this.currentlyOverlapping.get(node.support)
+  if (set) {
+    set.forEach(x => {
+      if (!this.visited.has(x)) {
+        set.delete(x)
+        this.currentlyOverlapping.get(x).delete(node.support)
+        this.callbacks.onEndOverlap(node.support, x)
+      }
+    })
+  }
+}
+
 /*
  * Creates a kdTree given a set of supports and a set of callbacks. Returns an
  * array of functions that can be used to update each object. The callbacks
@@ -206,70 +285,6 @@ function innerNode (nodes, axisIndex = 0) {
  * called, followed by onBeginOverlap or onEndOverlap.
  */
 export function kdTree (supports, callbacks, tolerance) {
-  const currentlyOverlapping = new Map()
-  const visited = new Set()
-  const out = new Vector3()
-  const initialAxis = new Vector3(1, 0, 0)
-  const dfs = (node, tree) => {
-    if (tree) {
-      if (overlaps(node, tree)) {
-        if (node !== tree.node && overlaps(node, tree.node)) {
-          const support = node.support
-          const other = tree.node.support
-          if (!currentlyOverlapping.has(support)) {
-            currentlyOverlapping.set(support, new Set())
-          }
-          if (getOverlap(out, support, other, initialAxis, tolerance)) {
-            if (!currentlyOverlapping.has(other)) {
-              currentlyOverlapping.set(other, new Set())
-            }
-            const supportSet = currentlyOverlapping.get(support)
-            const otherSet = currentlyOverlapping.get(other)
-
-            if (callbacks.onOverlap) {
-              callbacks.onOverlap(support, other, out)
-            }
-
-            if (!supportSet.has(other)) {
-              supportSet.add(other)
-              otherSet.add(support)
-              if (callbacks.onBeginOverlap) {
-                callbacks.onBeginOverlap(support, other, out)
-              }
-            } else {
-              if (callbacks.onStayOverlap) {
-                callbacks.onStayOverlap(support, other, out)
-              }
-            }
-            visited.add(other)
-          }
-        }
-        dfs(node, tree.left)
-        dfs(node, tree.right)
-      }
-    }
-  }
-
-  const handleUpdate = (node) => {
-    visited.clear()
-    dfs(node, root)
-    const set = currentlyOverlapping.get(node.support)
-    if (set) {
-      set.forEach(x => {
-        if (!visited.has(x)) {
-          set.delete(x)
-          currentlyOverlapping.get(x).delete(node.support)
-          callbacks.onEndOverlap(node.support, x)
-        }
-      })
-    }
-  }
-
-  const nodes = supports.map(x => leafNode(
-    x,
-    handleUpdate
-  ))
-
-  const root = innerNode(nodes)
-  return nodes.map(x => () => x.update())
+  const tree = new KdTree(supports, callbacks, tolerance)
+  return tree.nodes.map(x => () => x.update())
 }
