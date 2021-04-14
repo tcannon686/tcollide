@@ -16,6 +16,46 @@ function overlaps (left, right) {
   return true
 }
 
+function LeafNode (support, onUpdate) {
+  this.min = new Vector3()
+  this.max = new Vector3()
+  this.origin = new Vector3()
+  this.support = support
+  this.onUpdate = onUpdate
+  this.dirs = this.startDirs.map(x => new Vector3())
+}
+
+LeafNode.prototype.startDirs = [
+  new Vector3(-1, 0, 0),
+  new Vector3(0, -1, 0),
+  new Vector3(0, 0, -1),
+  new Vector3(1, 0, 0),
+  new Vector3(0, 1, 0),
+  new Vector3(0, 0, 1)
+]
+
+LeafNode.prototype.update = function () {
+  for (let i = 0; i < this.startDirs.length; i++) {
+    this.support(this.dirs[i].copy(this.startDirs[i]))
+  }
+  this.min.set(
+    this.dirs[0].x,
+    this.dirs[1].y,
+    this.dirs[2].z
+  )
+  this.max.set(
+    this.dirs[3].x,
+    this.dirs[4].y,
+    this.dirs[5].z
+  )
+  this.origin.copy(this.min).add(this.max).multiplyScalar(0.5)
+
+  if (this.parent) {
+    this.parent.update()
+  }
+  this.onUpdate(this)
+}
+
 /*
  * Returns a bounding box for the given support function. The bounding box is an
  * object that looks like this:
@@ -29,172 +69,132 @@ function overlaps (left, right) {
  * }
  */
 function leafNode (support, onUpdate) {
-  const min = new Vector3()
-  const max = new Vector3()
-  const origin = new Vector3()
+  return new LeafNode(support, onUpdate)
+}
 
-  const startDirs = [
-    new Vector3(-1, 0, 0),
-    new Vector3(0, -1, 0),
-    new Vector3(0, 0, -1),
-    new Vector3(1, 0, 0),
-    new Vector3(0, 1, 0),
-    new Vector3(0, 0, 1)
-  ]
+function InnerNode (nodes, axisIndex) {
+  this.axisName = axes[axisIndex]
+  this.firstMin = new Vector3()
+  this.firstMax = new Vector3()
+  this.firstPos = new Vector3()
 
-  const dirs = startDirs.map(x => new Vector3())
+  this.min = new Vector3()
+  this.max = new Vector3()
+  this.origin = new Vector3()
 
-  const ret = {
-    min,
-    max,
-    origin,
-    support
+  this.maxMove = 0.5
+  this.nodes = nodes
+
+  this.generate()
+}
+
+InnerNode.prototype.minOnAxis = function (a) {
+  return (
+    Math.min(
+      this.left ? this.left.min[a] : Infinity,
+      this.right ? this.right.min[a] : Infinity,
+      this.node.min[a]
+    )
+  )
+}
+
+InnerNode.prototype.maxOnAxis = function (a) {
+  return (
+    Math.max(
+      this.left ? this.left.max[a] : -Infinity,
+      this.right ? this.right.max[a] : -Infinity,
+      this.node.max[a]
+    )
+  )
+}
+
+InnerNode.prototype.updateBox = function () {
+  this.min.set(
+    this.minOnAxis('x'),
+    this.minOnAxis('y'),
+    this.minOnAxis('z')
+  )
+  this.max.set(
+    this.maxOnAxis('x'),
+    this.maxOnAxis('y'),
+    this.maxOnAxis('z')
+  )
+  this.origin.copy(this.min).add(this.max).multiplyScalar(0.5)
+}
+
+InnerNode.prototype.updateStartSize = function () {
+  this.firstMin.copy(this.min)
+  this.firstMax.copy(this.max)
+  this.firstPos.copy(this.node.origin)
+  this.maxMove = this.firstMax[this.axisName] - this.firstMin[this.axisName]
+}
+
+InnerNode.prototype.generate = function () {
+  /* Find the median. */
+  const k = Math.floor(this.nodes.length / 2)
+  this.node = quickselect(
+    this.nodes,
+    k,
+    (a, b) => b.origin[this.axisName] - a.origin[this.axisName]
+  )
+  const leftNodes = []
+  const rightNodes = []
+
+  /* Partition based on the median. */
+  for (let i = 0; i < this.nodes.length; i++) {
+    if (this.nodes[i] !== this.node) {
+      if (
+        this.nodes[i].origin[this.axisName] < this.node.origin[this.axisName]
+      ) {
+        leftNodes.push(this.nodes[i])
+      } else {
+        rightNodes.push(this.nodes[i])
+      }
+    }
   }
 
-  const update = () => {
-    dirs.forEach((x, i) => support(x.copy(startDirs[i])))
-
-    min.set(
-      dirs[0].x,
-      dirs[1].y,
-      dirs[2].z
-    )
-    max.set(
-      dirs[3].x,
-      dirs[4].y,
-      dirs[5].z
-    )
-    origin.copy(min).add(max).multiplyScalar(0.5)
-
-    ret.parent.update()
-    onUpdate(ret)
+  this.node.parent = this
+  this.left = innerNode(leftNodes, (this.axisIndex + 1) % axes.length)
+  if (this.left) {
+    this.left.parent = this
   }
+  this.right = innerNode(rightNodes, (this.axisIndex + 1) % axes.length)
+  if (this.right) {
+    this.right.parent = this
+  }
+  this.updateBox()
+  this.updateStartSize()
+}
 
-  ret.update = update
-  return ret
+InnerNode.prototype.update = function () {
+  this.updateBox()
+  if (
+    (this.min.x - this.firstMin.x) < -this.maxMove ||
+    (this.min.y - this.firstMin.y) < -this.maxMove ||
+    (this.min.z - this.firstMin.z) < -this.maxMove ||
+    (this.max.x - this.firstMax.x) > this.maxMove ||
+    (this.max.y - this.firstMax.y) > this.maxMove ||
+    (this.max.z - this.firstMax.z) > this.maxMove ||
+    Math.abs(this.node.origin.x - this.firstPos.x) > this.maxMove ||
+    Math.abs(this.node.origin.y - this.firstPos.y) > this.maxMove ||
+    Math.abs(this.node.origin.z - this.firstPos.z) > this.maxMove
+  ) {
+    if (!this.parent || !this.parent.update()) {
+      this.generate()
+    }
+    return true
+  } else {
+    if (this.parent) {
+      return this.parent.update()
+    }
+  }
 }
 
 function innerNode (nodes, axisIndex = 0) {
   if (nodes.length === 0) {
     return null
   }
-
-  const axisName = axes[axisIndex]
-
-  const firstMin = new Vector3()
-  const firstMax = new Vector3()
-  const firstPos = new Vector3()
-
-  const min = new Vector3()
-  const max = new Vector3()
-  const origin = new Vector3()
-
-  let maxMove = 0.5
-
-  const minOnAxis = (a) => (
-    Math.min(
-      ret.left ? ret.left.min[a] : Infinity,
-      ret.right ? ret.right.min[a] : Infinity,
-      ret.node.min[a]
-    )
-  )
-
-  const maxOnAxis = (a) => (
-    Math.max(
-      ret.left ? ret.left.max[a] : -Infinity,
-      ret.right ? ret.right.max[a] : -Infinity,
-      ret.node.max[a]
-    )
-  )
-
-  const updateBox = () => {
-    min.set(
-      minOnAxis('x'),
-      minOnAxis('y'),
-      minOnAxis('z')
-    )
-    max.set(
-      maxOnAxis('x'),
-      maxOnAxis('y'),
-      maxOnAxis('z')
-    )
-    origin.copy(min).add(max).multiplyScalar(0.5)
-  }
-
-  const ret = {
-    min,
-    max,
-    origin
-  }
-
-  const updateStartSize = () => {
-    firstMin.copy(min)
-    firstMax.copy(max)
-    firstPos.copy(ret.node.origin)
-    maxMove = firstMax[axisName] - firstMin[axisName]
-  }
-
-  const generate = () => {
-    /* Find the median. */
-    const k = Math.floor(nodes.length / 2)
-    const node = quickselect(nodes, k, (a, b) => b.origin[axisName] - a.origin[axisName])
-    const leftNodes = []
-    const rightNodes = []
-
-    /* Partition based on the median. */
-    for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i] !== node) {
-        if (nodes[i].origin[axisName] < node.origin[axisName]) {
-          leftNodes.push(nodes[i])
-        } else {
-          rightNodes.push(nodes[i])
-        }
-      }
-    }
-
-    node.parent = ret
-    ret.node = node
-    ret.left = innerNode(leftNodes, (axisIndex + 1) % axes.length)
-    if (ret.left) {
-      ret.left.parent = ret
-    }
-    ret.right = innerNode(rightNodes, (axisIndex + 1) % axes.length)
-    if (ret.right) {
-      ret.right.parent = ret
-    }
-    updateBox()
-    updateStartSize()
-  }
-
-  const update = () => {
-    updateBox()
-    if (
-      (min.x - firstMin.x) < -maxMove ||
-      (min.y - firstMin.y) < -maxMove ||
-      (min.z - firstMin.z) < -maxMove ||
-      (max.x - firstMax.x) > maxMove ||
-      (max.y - firstMax.y) > maxMove ||
-      (max.z - firstMax.z) > maxMove ||
-      Math.abs(ret.node.origin.x - firstPos.x) > maxMove ||
-      Math.abs(ret.node.origin.y - firstPos.y) > maxMove ||
-      Math.abs(ret.node.origin.z - firstPos.z) > maxMove
-    ) {
-      if (!ret.parent || !ret.parent.update()) {
-        generate()
-      }
-      return true
-    } else {
-      if (ret.parent) {
-        return ret.parent.update()
-      }
-    }
-  }
-
-  generate()
-
-  ret.update = update
-
-  return ret
+  return new InnerNode(nodes, axisIndex)
 }
 
 /*
@@ -271,5 +271,5 @@ export function kdTree (supports, callbacks, tolerance) {
   ))
 
   const root = innerNode(nodes)
-  return nodes.map(x => x.update)
+  return nodes.map(x => () => x.update())
 }
