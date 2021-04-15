@@ -23,6 +23,7 @@ function LeafNode (support, onUpdate) {
   this.support = support
   this.onUpdate = onUpdate
   this.dirs = this.startDirs.map(x => new Vector3())
+  this.updateBox()
 }
 
 LeafNode.prototype.startDirs = [
@@ -34,7 +35,7 @@ LeafNode.prototype.startDirs = [
   new Vector3(0, 0, 1)
 ]
 
-LeafNode.prototype.update = function () {
+LeafNode.prototype.updateBox = function () {
   for (let i = 0; i < this.startDirs.length; i++) {
     this.support(this.dirs[i].copy(this.startDirs[i]))
   }
@@ -49,7 +50,10 @@ LeafNode.prototype.update = function () {
     this.dirs[5].z
   )
   this.origin.copy(this.min).add(this.max).multiplyScalar(0.5)
+}
 
+LeafNode.prototype.update = function () {
+  this.updateBox()
   if (this.parent) {
     this.parent.update()
   }
@@ -72,9 +76,7 @@ function leafNode (support, onUpdate) {
   return new LeafNode(support, onUpdate)
 }
 
-function InnerNode (nodes, axisIndex) {
-  this.axisIndex = axisIndex
-  this.axisName = axes[axisIndex]
+function InnerNode (nodes) {
   this.firstMin = new Vector3()
   this.firstMax = new Vector3()
   this.firstPos = new Vector3()
@@ -131,37 +133,58 @@ InnerNode.prototype.updateStartSize = function () {
 }
 
 InnerNode.prototype.generate = function () {
-  /* Find the median. */
-  const k = Math.floor(this.nodes.length / 2)
-  this.node = quickselect(
-    this.nodes,
-    k,
-    (a, b) => b.origin[this.axisName] - a.origin[this.axisName]
-  )
-  const leftNodes = []
-  const rightNodes = []
+  if (this.nodes.length === 1) {
+    this.node = this.nodes[0]
+    this.node.parent = this
+    this.left = null
+    this.right = null
+  } else {
+    /* Split along axis with highest variance. */
+    const means = axes.map(axis => (
+      this.nodes.map(x => x.origin[axis]).reduce((a, b) => a + b) /
+      this.nodes.length
+    ))
+    const variances = axes.map((axis, i) => (
+      this.nodes
+        .map(x => (x.origin[axis] - means[i]) ** 2)
+        .reduce((x, y) => x + y)
+    ))
 
-  /* Partition based on the median. */
-  for (let i = 0; i < this.nodes.length; i++) {
-    if (this.nodes[i] !== this.node) {
-      if (
-        this.nodes[i].origin[this.axisName] < this.node.origin[this.axisName]
-      ) {
-        leftNodes.push(this.nodes[i])
-      } else {
-        rightNodes.push(this.nodes[i])
+    this.axisIndex = variances.indexOf(Math.max(...variances))
+    this.axisName = axes[this.axisIndex]
+
+    /* Find the median. */
+    const k = Math.floor(this.nodes.length / 2)
+    this.node = quickselect(
+      this.nodes,
+      k,
+      (a, b) => b.origin[this.axisName] - a.origin[this.axisName]
+    )
+    this.node.parent = this
+    const leftNodes = []
+    const rightNodes = []
+
+    /* Partition based on the median. */
+    for (let i = 0; i < this.nodes.length; i++) {
+      if (this.nodes[i] !== this.node) {
+        if (
+          this.nodes[i].origin[this.axisName] < this.node.origin[this.axisName]
+        ) {
+          leftNodes.push(this.nodes[i])
+        } else {
+          rightNodes.push(this.nodes[i])
+        }
       }
     }
-  }
 
-  this.node.parent = this
-  this.left = innerNode(leftNodes, (this.axisIndex + 1) % axes.length)
-  if (this.left) {
-    this.left.parent = this
-  }
-  this.right = innerNode(rightNodes, (this.axisIndex + 1) % axes.length)
-  if (this.right) {
-    this.right.parent = this
+    this.left = innerNode(leftNodes)
+    if (this.left) {
+      this.left.parent = this
+    }
+    this.right = innerNode(rightNodes)
+    if (this.right) {
+      this.right.parent = this
+    }
   }
   this.updateBox()
   this.updateStartSize()
@@ -191,11 +214,17 @@ InnerNode.prototype.update = function () {
   }
 }
 
-function innerNode (nodes, axisIndex = 0) {
+InnerNode.prototype.height = function () {
+  return Math.max(
+    this.left ? this.left.height() : 0,
+    this.right ? this.right.height() : 0) + 1
+}
+
+function innerNode (nodes) {
   if (nodes.length === 0) {
     return null
   }
-  return new InnerNode(nodes, axisIndex)
+  return new InnerNode(nodes)
 }
 
 function KdTree (supports, callbacks, tolerance) {
@@ -204,14 +233,13 @@ function KdTree (supports, callbacks, tolerance) {
   this.currentlyOverlapping = new Map()
   this.visited = new Set()
   this.out = new Vector3()
-  this.initialAxis = new Vector3(1, 0, 0)
 
   this.nodes = supports.map(x => leafNode(
     x,
-    (x) => this.handleUpdate(x)
+    x => this.handleUpdate(x)
   ))
 
-  this.root = innerNode(this.nodes)
+  this.root = innerNode([...this.nodes])
 }
 
 KdTree.prototype.dfs = function (node, tree, out) {
@@ -223,12 +251,14 @@ KdTree.prototype.dfs = function (node, tree, out) {
         if (!this.currentlyOverlapping.has(support)) {
           this.currentlyOverlapping.set(support, new Set())
         }
+
+        const initialAxis = new Vector3(1, 0, 0)
         if (
           getOverlap(
             out,
             support,
             other,
-            this.initialAxis,
+            initialAxis,
             this.tolerance)
         ) {
           if (!this.currentlyOverlapping.has(other)) {
