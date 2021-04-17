@@ -16,6 +16,9 @@ import {
 
 import { Vector3, Matrix4 } from 'three'
 
+const right = new Vector3(1, 0, 0)
+const tolerance = 0.001
+
 test('getOverlap boxes', () => {
   {
     const box1 = box({})
@@ -102,17 +105,10 @@ test('getOverlap hull', () => {
   expect(out.dot(new Vector3(1, -1, 0))).toBeGreaterThan(0)
 })
 
-test('getOverlap worst', () => {
-  const s = sphere({ position: [0, 0, 0], radius: 1.0 })
-  const out = new Vector3()
-  expect(getOverlap(out, s, s)).toBe(true)
-  expect(out.length() - 2.0).toBeLessThan(0.1)
-})
-
 test('gjk boxes', () => {
   const box1 = box({})
   const box2 = box({ position: [0.25, 0.25, 0] })
-  expect(gjk(box1, box2)).toBe(true)
+  expect(gjk(box1, box2, right.clone(), [], tolerance)).toBe(true)
 })
 
 test('gjk spheres', () => {
@@ -127,7 +123,7 @@ test('gjk spheres', () => {
           position: [i, j, k],
           radius: 2.0
         })
-        expect(gjk(sphere1, sphere2)).toBe(
+        expect(gjk(sphere1, sphere2, right.clone(), [], tolerance)).toBe(
           (i - 5) ** 2 + (j - 5) ** 2 + (k - 5) ** 2 < (5 + 2) ** 2
         )
       }
@@ -145,7 +141,7 @@ test('gjk cylinders', () => {
     circle({ position: [-1.95, 0.975 + 1, 0] })
   )
   const out = new Vector3()
-  expect(gjk(cylinder1, cylinder2)).toBe(true)
+  expect(gjk(cylinder1, cylinder2, right.clone(), [], tolerance)).toBe(true)
   expect(getOverlap(out, cylinder1, cylinder2)).toBe(true)
   expect(out.lengthSq()).toBeGreaterThan(0)
 })

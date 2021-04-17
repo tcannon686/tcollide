@@ -1,19 +1,19 @@
 import { Vector3 } from 'three'
 import { getOverlap } from './gjk.js'
 import { quickselect } from './quickselect.js'
+import { profiler } from './profile'
 
 const axes = ['x', 'y', 'z']
 
 function overlaps (left, right) {
-  for (const axis of axes) {
-    if (
-      left.max[axis] < right.min[axis] ||
-      left.min[axis] > right.max[axis]
-    ) {
-      return false
-    }
-  }
-  return true
+  return (
+    left.max.x >= right.min.x &&
+    left.min.x <= right.max.x &&
+    left.max.y >= right.min.y &&
+    left.min.y <= right.max.y &&
+    left.max.z >= right.min.z &&
+    left.min.z <= right.max.z
+  )
 }
 
 function LeafNode (support, onUpdate) {
@@ -76,7 +76,9 @@ function leafNode (support, onUpdate) {
   return new LeafNode(support, onUpdate)
 }
 
-function InnerNode (nodes) {
+function InnerNode (nodes, parent) {
+  this.parent = parent
+
   this.firstMin = new Vector3()
   this.firstMax = new Vector3()
   this.firstPos = new Vector3()
@@ -133,6 +135,12 @@ InnerNode.prototype.updateStartSize = function () {
 }
 
 InnerNode.prototype.generate = function () {
+  if (profiler()) {
+    if (!this.parent) {
+      profiler().data.treeGenerateStopwatch.start()
+    }
+  }
+
   if (this.nodes.length === 1) {
     this.node = this.nodes[0]
     this.node.parent = this
@@ -177,17 +185,18 @@ InnerNode.prototype.generate = function () {
       }
     }
 
-    this.left = innerNode(leftNodes)
-    if (this.left) {
-      this.left.parent = this
-    }
-    this.right = innerNode(rightNodes)
-    if (this.right) {
-      this.right.parent = this
-    }
+    this.left = innerNode(leftNodes, this)
+    this.right = innerNode(rightNodes, this)
   }
   this.updateBox()
   this.updateStartSize()
+
+  if (profiler()) {
+    if (!this.parent) {
+      profiler().data.treeGenerateStopwatch.stop()
+      profiler().data.treeHeight.add(this.height())
+    }
+  }
 }
 
 InnerNode.prototype.update = function () {
@@ -220,11 +229,11 @@ InnerNode.prototype.height = function () {
     this.right ? this.right.height() : 0) + 1
 }
 
-function innerNode (nodes) {
+function innerNode (nodes, parent) {
   if (nodes.length === 0) {
     return null
   }
-  return new InnerNode(nodes)
+  return new InnerNode(nodes, parent)
 }
 
 function KdTree (supports, callbacks, tolerance) {
@@ -239,7 +248,7 @@ function KdTree (supports, callbacks, tolerance) {
     x => this.handleUpdate(x)
   ))
 
-  this.root = innerNode([...this.nodes])
+  this.root = innerNode([...this.nodes], null)
 }
 
 KdTree.prototype.dfs = function (node, tree, out) {
@@ -292,17 +301,25 @@ KdTree.prototype.dfs = function (node, tree, out) {
 }
 
 KdTree.prototype.handleUpdate = function (node) {
+  if (profiler()) {
+    profiler().data.updateStopwatch.start()
+  }
+
   this.visited.clear()
   this.dfs(node, this.root, this.out)
   const set = this.currentlyOverlapping.get(node.support)
   if (set) {
-    set.forEach(x => {
+    for (const x of set) {
       if (!this.visited.has(x)) {
         set.delete(x)
         this.currentlyOverlapping.get(x).delete(node.support)
         this.callbacks.onEndOverlap(node.support, x)
       }
-    })
+    }
+  }
+
+  if (profiler()) {
+    profiler().data.updateStopwatch.stop()
   }
 }
 

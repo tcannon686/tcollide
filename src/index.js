@@ -1,11 +1,13 @@
 import { Vector3, Matrix4, Matrix3 } from 'three'
-import { kdTree } from './src/kdtree.js'
+import { kdTree } from './kdtree.js'
 import { Subject, BehaviorSubject } from 'rxjs'
 import { sample } from 'rxjs/operators'
+import { profiler, createProfiler } from './profile'
 
-import { transformable } from './src/shapes'
+import { transformable } from './shapes'
 
-export * from './src/shapes'
+export * from './shapes'
+export { profiler, createProfiler }
 
 /**
  * @property {Vector3} amount

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: src/shapes.js</title>
+    <title>JSDoc: Source: shapes.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: src/shapes.js</h1>
+    <h1 class="page-title">Source: shapes.js</h1>
 
     
 
@@ -27,6 +27,53 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>import { Vector3 } from 'three'
+
+/* Error checking. */
+function validateVector (msg, v) {
+  if (!Array.isArray(v)) {
+    throw new Error(msg + ': expected Number[] but got ' + v)
+  }
+  if (v.some(x => typeof x !== 'number')) {
+    throw new Error(msg + ': expected Number[] but got ' + v)
+  }
+}
+
+function validatePositiveVector (msg, v) {
+  validateVector(msg, v)
+  if (v.some(x => x &lt;= 0)) {
+    throw new Error(msg + ': expected positive Number[] but got ' + v)
+  }
+}
+
+function validateNumber (msg, v) {
+  if (typeof v !== 'number') {
+    throw new Error(msg + ': expected Number but got ' + v)
+  }
+}
+
+function validatePositive (msg, v) {
+  if (v &lt;= 0) {
+    throw new Error(msg + ': expected positive Number but got ' + v)
+  }
+}
+
+function validateOptional (msg, v, f) {
+  if (v !== undefined) {
+    f(msg, v)
+  }
+}
+
+function validateFunction (msg, v) {
+  if (typeof v !== 'function') {
+    throw new Error(msg + ': expected Function but got ' + v)
+  }
+}
+
+function validateSupport (msg, v) {
+  if (typeof v !== 'function') {
+    throw new Error(msg + ': expected support Function but got ' + v)
+  }
+}
 
 /**
  * A function that returns the point with the highest dot product with the given
@@ -48,8 +95,12 @@ export function sphere ({
   position,
   radius
 }) {
+  validateOptional('sphere', position, validateVector)
+  validateOptional('sphere', radius, validatePositive)
+
   const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
   const r = radius || 1.0
+
   return (d) => (
     d.multiplyScalar(r).add(p)
   )
@@ -70,6 +121,10 @@ export function circle ({
   radius,
   axis
 }) {
+  validateOptional('circle', position, validateVector)
+  validateOptional('circle', axis, validateVector)
+  validateOptional('circle', radius, validatePositive)
+
   const p = position ? new Vector3(...position) : new Vector3(0, 0, 0)
   const a = axis ? new Vector3(...axis) : new Vector3(0, 1, 0)
   const r = radius || 1.0
@@ -91,6 +146,9 @@ export function box ({
   position,
   size
 }) {
+  validateOptional('box', position, validateVector)
+  validateOptional('box', size, validatePositiveVector)
+
   const p = position || [0, 0, 0]
   const s = size || [1, 1, 1]
   return (d) => (
@@ -111,6 +169,10 @@ export function box ({
  * @returns {Support}
  */
 export function point (x, y, z) {
+  validateNumber('point', x)
+  validateNumber('point', y)
+  validateNumber('point', z)
+
   return (d) => {
     d.set(x, y, z)
   }
@@ -127,6 +189,11 @@ export function point (x, y, z) {
 export function hull (...supports) {
   const v = new Vector3()
   const best = new Vector3()
+
+  for (const f of supports) {
+    validateSupport('hull', f)
+  }
+
   return (d) => {
     let bestDot = -Infinity
     for (const f of supports) {
@@ -151,6 +218,11 @@ export function hull (...supports) {
 export function sum (...supports) {
   const v = new Vector3()
   const t = new Vector3()
+
+  for (const f of supports) {
+    validateSupport('sum', f)
+  }
+
   return (d) => {
     t.set(0, 0, 0)
     for (const f of supports) {
@@ -172,6 +244,10 @@ export function sum (...supports) {
  * @param {Number[]} d - The direction (default up)
  */
 export function split (a, b, d = [0, 1, 0]) {
+  validateSupport('split', a)
+  validateSupport('split', b)
+  validateVector('split', d)
+
   const v = new Vector3(...d)
   return (d) => {
     if (v.dot(d) >= 0) {
@@ -199,6 +275,10 @@ export function split (a, b, d = [0, 1, 0]) {
  * @returns {Support}
  */
 export function transformable (support, transform, inverse) {
+  validateSupport('transformable', support)
+  validateFunction('transformable', transform)
+  validateFunction('transformable', inverse)
+
   return (d) => {
     inverse(d)
     support(d)
@@ -215,13 +295,13 @@ export function transformable (support, transform, inverse) {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#body">body</a></li><li><a href="global.html#box">box</a></li><li><a href="global.html#circle">circle</a></li><li><a href="global.html#collisionScene">collisionScene</a></li><li><a href="global.html#hull">hull</a></li><li><a href="global.html#point">point</a></li><li><a href="global.html#scene">scene</a></li><li><a href="global.html#sphere">sphere</a></li><li><a href="global.html#split">split</a></li><li><a href="global.html#sum">sum</a></li><li><a href="global.html#transformable">transformable</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#body">body</a></li><li><a href="global.html#box">box</a></li><li><a href="global.html#circle">circle</a></li><li><a href="global.html#collisionScene">collisionScene</a></li><li><a href="global.html#createProfiler">createProfiler</a></li><li><a href="global.html#hull">hull</a></li><li><a href="global.html#point">point</a></li><li><a href="global.html#profiler">profiler</a></li><li><a href="global.html#scene">scene</a></li><li><a href="global.html#sphere">sphere</a></li><li><a href="global.html#split">split</a></li><li><a href="global.html#sum">sum</a></li><li><a href="global.html#transformable">transformable</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Tue Mar 30 2021 15:25:24 GMT-0700 (Pacific Daylight Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Apr 16 2021 17:03:05 GMT-0700 (Pacific Daylight Time)
 </footer>
 
 <script> prettyPrint(); </script>

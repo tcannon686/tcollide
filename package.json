@@ -3,7 +3,7 @@
   "version": "0.2.1",
   "description": "A simple collision detection library for three.js",
   "type": "module",
-  "main": "index.js",
+  "main": "src/index.js",
   "author": "Thomas Cannon <tom-cannon@playcannon.com>",
   "license": "MIT",
   "dependencies": {
@@ -19,6 +19,6 @@
   "scripts": {
     "lint": "standard",
     "test": "jest",
-    "makedocs": "jsdoc -r src *.js README.md -d ./docs/"
+    "makedocs": "jsdoc -r src README.md -d ./docs/"
   }
 }
