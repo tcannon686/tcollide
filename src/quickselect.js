@@ -1,3 +1,4 @@
+import { profiler } from './profile'
 
 function partition (list, left, right, pivotIndex, compare) {
   const pivotValue = list[pivotIndex]
@@ -45,5 +46,12 @@ function select (list, left, right, k, compare) {
 const defaultCompare = (a, b) => (a - b)
 
 export function quickselect (list, k, compare = defaultCompare) {
-  return select(list, 0, list.length - 1, k, compare)
+  if (profiler()) {
+    profiler().data.quickselectStopwatch.start()
+  }
+  const ret = select(list, 0, list.length - 1, k, compare)
+  if (profiler()) {
+    profiler().data.quickselectStopwatch.stop()
+  }
+  return ret
 }

@@ -54,6 +54,7 @@ function makeProfiler () {
     supportStopwatch: meanStopwatch(),
     updateStopwatch: meanStopwatch(),
     treeGenerateStopwatch: meanStopwatch(),
+    quickselectStopwatch: meanStopwatch(),
     gjkIterations: rollingMean(),
     epaIterations: rollingMean(),
     treeHeight: rollingMean(),
