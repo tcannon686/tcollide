@@ -91,7 +91,7 @@ export function body ({ supports, isKinematic }) {
     f.body = ret
     return f
   })
-  return ret
+  return Object.freeze(ret)
 }
 
 /**
@@ -193,7 +193,7 @@ export function collisionScene ({ tolerance }) {
 
   let shouldUpdateTree = false
 
-  return {
+  return Object.freeze({
     add (body) {
       bodies.push(body)
       shouldUpdateTree = true
@@ -210,7 +210,7 @@ export function collisionScene ({ tolerance }) {
       updated.next()
     },
     overlapped
-  }
+  })
 }
 
 /**
@@ -277,7 +277,7 @@ export function scene ({ gravity, tolerance }) {
 
   cScene.overlapped.subscribe(onOverlap)
 
-  return {
+  return Object.freeze({
     add (body) {
       if (!body.isKinematic) {
         dynamicBodies.push(body)
@@ -299,5 +299,5 @@ export function scene ({ gravity, tolerance }) {
       })
       cScene.update()
     }
-  }
+  })
 }
