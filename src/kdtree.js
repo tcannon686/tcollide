@@ -323,6 +323,16 @@ KdTree.prototype.handleUpdate = function (node) {
   }
 }
 
+KdTree.prototype.dispose = function () {
+  this.currentlyOverlapping.forEach((set, support) => {
+    if (set) {
+      set.forEach(other => {
+        this.callbacks.onEndOverlap(support, other)
+      })
+    }
+  })
+}
+
 /*
  * Creates a kdTree given a set of supports and a set of callbacks. Returns an
  * array of functions that can be used to update each object. The callbacks
@@ -336,13 +346,7 @@ export function kdTree (supports, callbacks, tolerance) {
   return {
     updates: tree.nodes.map(x => () => x.update()),
     dispose () {
-      tree.currentlyOverlapping.forEach((set, support) => {
-        if (set) {
-          set.forEach(other => {
-            this.callbacks.onEndOverlap(set, support)
-          })
-        }
-      })
+      tree.dispose()
     }
   }
 }
