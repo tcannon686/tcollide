@@ -122,7 +122,7 @@ export function collisionScene ({ tolerance }) {
   tolerance = tolerance || 0.001
   const bodies = []
   let subscriptions = []
-  let updates = null
+  let tree = null
 
   const overlapped = new Subject()
 
@@ -183,11 +183,14 @@ export function collisionScene ({ tolerance }) {
 
   const updateTree = () => {
     subscriptions.forEach(x => { x.unsubscribe() })
-    updates = makeTree()
+    if (tree) {
+      tree.dispose()
+    }
+    tree = makeTree()
     subscriptions = bodies.map((x, i) => (
       x.changed.pipe(
         sample(updated)
-      ).subscribe(updates[i])
+      ).subscribe(tree.updates[i])
     ))
   }
 

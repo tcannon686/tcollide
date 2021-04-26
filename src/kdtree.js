@@ -333,5 +333,16 @@ KdTree.prototype.handleUpdate = function (node) {
  */
 export function kdTree (supports, callbacks, tolerance) {
   const tree = new KdTree(supports, callbacks, tolerance)
-  return tree.nodes.map(x => () => x.update())
+  return {
+    updates: tree.nodes.map(x => () => x.update()),
+    dispose () {
+      tree.currentlyOverlapping.forEach((set, support) => {
+        if (set) {
+          set.forEach(other => {
+            this.callbacks.onEndOverlap(set, support)
+          })
+        }
+      })
+    }
+  }
 }
