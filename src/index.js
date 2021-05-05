@@ -121,8 +121,7 @@ export function body ({ supports, isKinematic }) {
 export function collisionScene ({ tolerance }) {
   tolerance = tolerance || 0.001
   const bodies = []
-  let subscriptions = []
-  let tree = null
+  const subscriptions = new WeakMap()
 
   const overlapped = new Subject()
 
@@ -169,47 +168,40 @@ export function collisionScene ({ tolerance }) {
     }
   }
 
-  const makeTree = () => (
-    kdTree(bodies.flatMap(x => x.supports), {
-      onBeginOverlap,
-      onEndOverlap,
-      onStayOverlap,
-      onOverlap
-    },
-    tolerance)
-  )
+  const tree = kdTree({
+    onBeginOverlap,
+    onEndOverlap,
+    onStayOverlap,
+    onOverlap
+  }, tolerance)
 
   const updated = new Subject()
-
-  const updateTree = () => {
-    subscriptions.forEach(x => { x.unsubscribe() })
-    if (tree) {
-      tree.dispose()
-    }
-    tree = makeTree()
-    subscriptions = bodies.map((x, i) => (
-      x.changed.pipe(
-        sample(updated)
-      ).subscribe(tree.updates[i])
-    ))
-  }
-
-  let shouldUpdateTree = false
 
   return Object.freeze({
     add (body) {
       bodies.push(body)
-      shouldUpdateTree = true
+      body.supports.forEach(support => {
+        /* Subscribe to update events. */
+        subscriptions.set(
+          support,
+          body.changed.pipe(
+            sample(updated)
+          ).subscribe(tree.add(support))
+        )
+      })
     },
     remove (body) {
       bodies.splice(bodies.indexOf(body), 1)
-      shouldUpdateTree = true
+      /* Unsubscribe from update events. */
+      body.supports.forEach(support => {
+        tree.remove(support)
+        const subscription = subscriptions.get(support)
+        if (subscription) {
+          subscription.unsubscribe()
+        }
+      })
     },
     update () {
-      if (shouldUpdateTree) {
-        updateTree()
-        shouldUpdateTree = false
-      }
       updated.next()
     },
     overlapped

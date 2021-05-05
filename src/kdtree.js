@@ -236,19 +236,27 @@ function innerNode (nodes, parent) {
   return new InnerNode(nodes, parent)
 }
 
-function KdTree (supports, callbacks, tolerance) {
+function KdTree (callbacks, tolerance) {
   this.callbacks = callbacks
   this.tolerance = tolerance
   this.currentlyOverlapping = new Map()
   this.visited = new Set()
   this.out = new Vector3()
+  this.needsRebuild = true
+  this.nodes = []
+}
 
-  this.nodes = supports.map(x => leafNode(
-    x,
-    x => this.handleUpdate(x)
-  ))
+KdTree.prototype.add = function (support) {
+  const node = leafNode(support, this.handleUpdate.bind(this))
+  this.needsRebuild = true
+  this.nodes.push(node)
+  /* Return the update function for the node. */
+  return node.update.bind(node)
+}
 
-  this.root = innerNode([...this.nodes], null)
+KdTree.prototype.remove = function (support) {
+  this.nodes.splice(this.nodes.findIndex(node => node.support === support), 1)
+  this.needsRebuild = true
 }
 
 KdTree.prototype.dfs = function (node, tree, out) {
@@ -305,6 +313,12 @@ KdTree.prototype.handleUpdate = function (node) {
     profiler().data.updateStopwatch.start()
   }
 
+  /* Rebuild the tree if necessary. */
+  if (this.needsRebuild) {
+    this.root = innerNode([...this.nodes], null)
+    this.needsRebuild = false
+  }
+
   this.visited.clear()
   this.dfs(node, this.root, this.out)
   const set = this.currentlyOverlapping.get(node.support)
@@ -334,19 +348,13 @@ KdTree.prototype.dispose = function () {
 }
 
 /*
- * Creates a kdTree given a set of supports and a set of callbacks. Returns an
- * array of functions that can be used to update each object. The callbacks
- * object may contain three methods: onBeginOverlap(support, other, amount),
- * onEndOverlap(support, other, amount), onStayOverlap(support, other, overlap),
- * and onOverlap(support, other, amount). If any overlap occurs, onOverlap is
- * called, followed by onBeginOverlap or onEndOverlap.
+ * Creates a kdTree given a set of supports and a set of callbacks. The
+ * callbacks object may contain three methods: onBeginOverlap(support, other,
+ * amount), onEndOverlap(support, other, amount), onStayOverlap(support, other,
+ * overlap), and onOverlap(support, other, amount). If any overlap occurs,
+ * onOverlap is called, followed by onBeginOverlap or onEndOverlap.
  */
-export function kdTree (supports, callbacks, tolerance) {
-  const tree = new KdTree(supports, callbacks, tolerance)
-  return {
-    updates: tree.nodes.map(x => () => x.update()),
-    dispose () {
-      tree.dispose()
-    }
-  }
+export function kdTree (callbacks, tolerance) {
+  const tree = new KdTree(callbacks, tolerance)
+  return tree
 }
