@@ -170,16 +170,20 @@ export function gjk (
   s = [],
   tolerance = 0.001
 ) {
-  if (profiler()) {
-    profiler().data.gjkStopwatch.start()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.gjkStopwatch.start()
+    }
   }
   const a = new Vector3()
   const b = new Vector3()
   let iterations = 0
   while (true) {
     iterations++
-    if (profiler()) {
-      profiler().data.supportStopwatch.start()
+    if (process.env.NODE_ENV === 'development') {
+      if (profiler()) {
+        profiler().data.supportStopwatch.start()
+      }
     }
     d.normalize()
     a.copy(d)
@@ -187,14 +191,18 @@ export function gjk (
     aSupport(a)
     bSupport(b)
     a.sub(b)
-    if (profiler()) {
-      profiler().data.supportStopwatch.stop()
+    if (process.env.NODE_ENV === 'development') {
+      if (profiler()) {
+        profiler().data.supportStopwatch.stop()
+      }
     }
 
     if (a.dot(d) < tolerance) {
-      if (profiler()) {
-        profiler().data.gjkIterations.add(iterations)
-        profiler().data.gjkStopwatch.stop()
+      if (process.env.NODE_ENV === 'development') {
+        if (profiler()) {
+          profiler().data.gjkIterations.add(iterations)
+          profiler().data.gjkStopwatch.stop()
+        }
       }
       return false
     }
@@ -202,14 +210,18 @@ export function gjk (
     /* Add to the simplex. */
     s.push(a.clone())
 
-    if (profiler()) {
-      profiler().data.nearestSimplexStopwatch.start()
+    if (process.env.NODE_ENV === 'development') {
+      if (profiler()) {
+        profiler().data.nearestSimplexStopwatch.start()
+      }
     }
     if (nearestSimplex[s.length](s, d)) {
-      if (profiler()) {
-        profiler().data.nearestSimplexStopwatch.stop()
-        profiler().data.gjkIterations.add(iterations)
-        profiler().data.gjkStopwatch.stop()
+      if (process.env.NODE_ENV === 'development') {
+        if (profiler()) {
+          profiler().data.nearestSimplexStopwatch.stop()
+          profiler().data.gjkIterations.add(iterations)
+          profiler().data.gjkStopwatch.stop()
+        }
       }
       return true
     }
@@ -224,8 +236,10 @@ export function epa (
   vertices,
   tolerance
 ) {
-  if (profiler()) {
-    profiler().data.epaStopwatch.start()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.epaStopwatch.start()
+    }
   }
 
   const a = new Vector3()
@@ -309,9 +323,11 @@ export function epa (
   }
   out.copy(nearest.normal).multiplyScalar(nearest.distance)
 
-  if (profiler()) {
-    profiler().data.epaIterations.add(iterations)
-    profiler().data.epaStopwatch.stop()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.epaIterations.add(iterations)
+      profiler().data.epaStopwatch.stop()
+    }
   }
 }
 
@@ -327,8 +343,10 @@ export function getOverlap (
   initialAxis = new Vector3(1, 0, 0),
   tolerance = 0.001
 ) {
-  if (profiler()) {
-    profiler().data.getOverlapStopwatch.start()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.getOverlapStopwatch.start()
+    }
   }
   const s = []
   const d = new Vector3().copy(initialAxis)
@@ -387,13 +405,17 @@ export function getOverlap (
     out.x = out.x || 0.0
     out.y = out.y || 0.0
     out.z = out.z || 0.0
-    if (profiler()) {
-      profiler().data.getOverlapStopwatch.stop()
+    if (process.env.NODE_ENV === 'development') {
+      if (profiler()) {
+        profiler().data.getOverlapStopwatch.stop()
+      }
     }
     return true
   }
-  if (profiler()) {
-    profiler().data.getOverlapStopwatch.stop()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.getOverlapStopwatch.stop()
+    }
   }
   return false
 }

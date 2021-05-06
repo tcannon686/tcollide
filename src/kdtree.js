@@ -16,12 +16,12 @@ function overlaps (left, right) {
   )
 }
 
-function LeafNode (support, onUpdate) {
+function LeafNode (support, root) {
   this.min = new Vector3()
   this.max = new Vector3()
   this.origin = new Vector3()
   this.support = support
-  this.onUpdate = onUpdate
+  this.root = root
   this.dirs = this.startDirs.map(x => new Vector3())
   this.updateBox()
 }
@@ -57,7 +57,7 @@ LeafNode.prototype.update = function () {
   if (this.parent) {
     this.parent.update()
   }
-  this.onUpdate(this)
+  this.root.handleUpdate(this)
 }
 
 /*
@@ -72,8 +72,8 @@ LeafNode.prototype.update = function () {
  *   onUpdate(), // Called when update is called
  * }
  */
-function leafNode (support, onUpdate) {
-  return new LeafNode(support, onUpdate)
+function leafNode (support, root) {
+  return new LeafNode(support, root)
 }
 
 function InnerNode (nodes, parent) {
@@ -135,9 +135,11 @@ InnerNode.prototype.updateStartSize = function () {
 }
 
 InnerNode.prototype.generate = function () {
-  if (profiler()) {
-    if (!this.parent) {
-      profiler().data.treeGenerateStopwatch.start()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      if (!this.parent) {
+        profiler().data.treeGenerateStopwatch.start()
+      }
     }
   }
 
@@ -148,17 +150,28 @@ InnerNode.prototype.generate = function () {
     this.right = null
   } else {
     /* Split along axis with highest variance. */
-    const means = axes.map(axis => (
-      this.nodes.map(x => x.origin[axis]).reduce((a, b) => a + b) /
-      this.nodes.length
-    ))
-    const variances = axes.map((axis, i) => (
-      this.nodes
-        .map(x => (x.origin[axis] - means[i]) ** 2)
-        .reduce((x, y) => x + y)
-    ))
+    const means = [0, 0, 0]
+    for (const k in this.nodes) {
+      means[0] += this.nodes[k].origin.x
+      means[1] += this.nodes[k].origin.y
+      means[2] += this.nodes[k].origin.z
+    }
+    means[0] /= this.nodes.length
+    means[1] /= this.nodes.length
+    means[2] /= this.nodes.length
 
-    this.axisIndex = variances.indexOf(Math.max(...variances))
+    const variances = [0, 0, 0]
+    for (const k in this.nodes) {
+      variances[0] += (this.nodes[k].origin.x - means[0]) ** 2
+      variances[1] += (this.nodes[k].origin.y - means[1]) ** 2
+      variances[2] += (this.nodes[k].origin.z - means[2]) ** 2
+    }
+
+    this.axisIndex = (
+      (variances[0] > variances[1])
+      ? (variances[0] > variances[2] ? 0 : 2)
+      : (variances[1] > variances[2] ? 1 : 2)
+    )
     this.axisName = axes[this.axisIndex]
 
     /* Find the median. */
@@ -191,10 +204,12 @@ InnerNode.prototype.generate = function () {
   this.updateBox()
   this.updateStartSize()
 
-  if (profiler()) {
-    if (!this.parent) {
-      profiler().data.treeGenerateStopwatch.stop()
-      profiler().data.treeHeight.add(this.height())
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      if (!this.parent) {
+        profiler().data.treeGenerateStopwatch.stop()
+        profiler().data.treeHeight.add(this.height())
+      }
     }
   }
 }
@@ -247,7 +262,7 @@ function KdTree (callbacks, tolerance) {
 }
 
 KdTree.prototype.add = function (support) {
-  const node = leafNode(support, this.handleUpdate.bind(this))
+  const node = leafNode(support, this)
   this.needsRebuild = true
   this.nodes.push(node)
   /* Return the update function for the node. */
@@ -309,8 +324,10 @@ KdTree.prototype.dfs = function (node, tree, out) {
 }
 
 KdTree.prototype.handleUpdate = function (node) {
-  if (profiler()) {
-    profiler().data.updateStopwatch.start()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.updateStopwatch.start()
+    }
   }
 
   /* Rebuild the tree if necessary. */
@@ -332,8 +349,10 @@ KdTree.prototype.handleUpdate = function (node) {
     }
   }
 
-  if (profiler()) {
-    profiler().data.updateStopwatch.stop()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.updateStopwatch.stop()
+    }
   }
 }
 

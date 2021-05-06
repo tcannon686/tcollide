@@ -46,12 +46,16 @@ function select (list, left, right, k, compare) {
 const defaultCompare = (a, b) => (a - b)
 
 export function quickselect (list, k, compare = defaultCompare) {
-  if (profiler()) {
-    profiler().data.quickselectStopwatch.start()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.quickselectStopwatch.start()
+    }
   }
   const ret = select(list, 0, list.length - 1, k, compare)
-  if (profiler()) {
-    profiler().data.quickselectStopwatch.stop()
+  if (process.env.NODE_ENV === 'development') {
+    if (profiler()) {
+      profiler().data.quickselectStopwatch.stop()
+    }
   }
   return ret
 }
