@@ -19,7 +19,6 @@ export { profiler, createProfiler }
 /**
  * A Support that is paired with a body.
  *
- * @property {Body} body
  * @typedef {Support} BodySupport
  */
 
@@ -35,11 +34,66 @@ export { profiler, createProfiler }
  * @property {Vector3} position - The current position. Set the position using
  *                                transform and then calling update()
  * @property {Vector3} velocity - The current velocity
- * @property {Subject} beginOverlap - An RxJS Subject that emits an OverlapInfo
- *                                    object
- * @property {Subject} endOverlap - An RxJS Subject that emits an OverlapInfo object
  * @property {Subject} isKinematic - Whether the object should be affected by physics
  */
+
+const privateMaps = {
+  beginOverlap: new WeakMap(),
+  stayOverlap: new WeakMap(),
+  endOverlap: new WeakMap(),
+  overlap: new WeakMap(),
+  changed: new WeakMap(),
+  bodyOf: new WeakMap()
+}
+
+/**
+ * Returns an RxJS observable that emits any time the given body changes.
+ *
+ * @param {Body} body
+ */
+export function changed(body) {
+  return privateMaps.changed.get(body).asObservable()
+}
+
+/**
+ * Returns an RxJS observable that emits an OverlapInfo object any time the
+ * given body collides with another body.
+ *
+ * @param {Body} body
+ */
+export function beginOverlap(body) {
+  return privateMaps.beginOverlap.get(body).asObservable()
+}
+
+/**
+ * Returns an RxJS observable that emits an OverlapInfo object when the given
+ * body stops colliding with another body.
+ *
+ * @param {Body} body
+ */
+export function endOverlap(body) {
+  return privateMaps.endOverlap.get(body).asObservable()
+}
+
+/**
+ * Returns an RxJS observable that emits an OverlapInfo object while the given
+ * body is overlapping another body.
+ *
+ * @param {Body} body
+ */
+export function stayOverlap(body) {
+  return privateMaps.stayOverlap.get(body).asObservable()
+}
+
+/**
+ * Returns an RxJS observable that emits an OverlapInfo any time two objects in
+ * the scene are overlapping.
+ *
+ * @param {Scene} scene
+ */
+export function overlap(scene) {
+  return privateMaps.overlap.get(scene).asObservable()
+}
 
 /**
  * Returns an object that can be added to the scene, built with the given
@@ -55,30 +109,27 @@ export { profiler, createProfiler }
 export function body ({ supports, isKinematic }) {
   const transform = new Matrix4()
   const transformInverse = new Matrix3()
-  const changed = new BehaviorSubject()
   const position = new Vector3(0, 0, 0)
   const velocity = new Vector3(0, 0, 0)
-
-  const beginOverlap = new Subject()
-  const stayOverlap = new Subject()
-  const endOverlap = new Subject()
 
   const ret = {
     update () {
       transformInverse.setFromMatrix4(transform)
       transformInverse.transpose()
       position.setFromMatrixPosition(transform)
-      changed.next()
+      privateMaps.changed.get(ret).next()
     },
     position,
     transform,
-    changed,
-    beginOverlap,
-    endOverlap,
-    stayOverlap,
     velocity,
     isKinematic
   }
+
+  privateMaps.beginOverlap.set(ret, new Subject())
+  privateMaps.stayOverlap.set(ret, new Subject())
+  privateMaps.endOverlap.set(ret, new Subject())
+  privateMaps.changed.set(ret, new BehaviorSubject())
+
   ret.supports = supports.map(x => {
     const f = transformable(
       x,
@@ -88,18 +139,27 @@ export function body ({ supports, isKinematic }) {
       (d) => {
         d.applyMatrix3(transformInverse)
       })
-    f.body = ret
+    privateMaps.bodyOf.set(f, ret)
     return f
   })
   return Object.freeze(ret)
 }
 
 /**
+ * Returns the body that the given support is attached too, or null if it is not
+ * attached to any body.
+ *
+ * @param {BodySupport} support
+ * @returns {Body}
+ */
+export function bodyOf (support) {
+  return privateMaps.bodyOf.get(support) || null
+}
+
+/**
  * @property {Function} add - Add a body to the scene
  * @property {Function} remove - Remove a body from the scene
  * @property {Function} update - Update the scene, trigger events
- * @property {Subject} overlapped - RxJS Subject that emits an OverlapInfo
- *                                  object when two objects overlap.
  * @typedef CollisionScene
  */
 
@@ -123,44 +183,42 @@ export function collisionScene ({ tolerance }) {
   const bodies = []
   const subscriptions = new WeakMap()
 
-  const overlapped = new Subject()
-
   const onOverlap = (support, other, amount) => {
-    overlapped.next({ support, other, amount })
+    privateMaps.overlap.get(ret).next({ support, other, amount })
   }
 
   const onBeginOverlap = (support, other, amount) => {
-    support.body.beginOverlap.next({
+    privateMaps.beginOverlap.get(bodyOf(support)).next({
       support,
       other,
       amount: amount.clone()
     })
-    other.body.beginOverlap.next({
+    privateMaps.beginOverlap.get(bodyOf(other)).next({
       support: other,
       other: support,
       amount: amount.clone().negate()
     })
   }
   const onEndOverlap = (support, other) => {
-    support.body.endOverlap.next({
+    privateMaps.endOverlap.get(bodyOf(support)).next({
       support,
       other
     })
-    other.body.endOverlap.next({
+    privateMaps.endOverlap.get(bodyOf(other)).next({
       support: other,
       other: support
     })
   }
   const onStayOverlap = (support, other, amount) => {
-    if (support.body.stayOverlap.observers.length > 0) {
-      support.body.stayOverlap.next({
+    if (privateMaps.stayOverlap.get(bodyOf(support)).observers.length > 0) {
+      privateMaps.stayOverlap.get(bodyOf(support)).next({
         support,
         other,
         amount: amount.clone()
       })
     }
-    if (other.body.stayOverlap.observers.length > 0) {
-      other.body.stayOverlap.next({
+    if (privateMaps.stayOverlap.get(bodyOf(other)).observers.length > 0) {
+      privateMaps.stayOverlap.get(bodyOf(other)).next({
         support: other,
         other: support,
         amount: amount.clone().negate()
@@ -177,14 +235,14 @@ export function collisionScene ({ tolerance }) {
 
   const updated = new Subject()
 
-  return Object.freeze({
+  const ret = Object.freeze({
     add (body) {
       bodies.push(body)
       body.supports.forEach(support => {
         /* Subscribe to update events. */
         subscriptions.set(
           support,
-          body.changed.pipe(
+          changed(body).pipe(
             sample(updated)
           ).subscribe(tree.add(support))
         )
@@ -203,9 +261,11 @@ export function collisionScene ({ tolerance }) {
     },
     update () {
       updated.next()
-    },
-    overlapped
+    }
   })
+
+  privateMaps.overlap.set(ret, new Subject())
+  return ret
 }
 
 /**
@@ -239,40 +299,42 @@ export function scene ({ gravity, tolerance }) {
       normal.copy(amount).normalize()
 
       /* Handle collisions. */
-      if (!a.body.isKinematic && !b.body.isKinematic) {
-        a.body.position.addScaledVector(amount, -0.5)
-        a.body.transform.setPosition(a.body.position)
-        b.body.position.addScaledVector(amount, 0.5)
-        b.body.transform.setPosition(b.body.position)
-        a.body.update()
-        b.body.update()
-      } else if (!b.body.isKinematic) {
-        b.body.position.add(amount)
-        b.body.transform.setPosition(b.body.position)
-        b.body.update()
-      } else if (!a.body.isKinematic) {
-        a.body.position.addScaledVector(amount, -1.0)
-        a.body.transform.setPosition(a.body.position)
-        a.body.update()
+      if (!bodyOf(a).isKinematic && !bodyOf(b).isKinematic) {
+        bodyOf(a).position.addScaledVector(amount, -0.5)
+        bodyOf(a).transform.setPosition(bodyOf(a).position)
+        bodyOf(b).position.addScaledVector(amount, 0.5)
+        bodyOf(b).transform.setPosition(bodyOf(b).position)
+        bodyOf(a).update()
+        bodyOf(b).update()
+      } else if (!bodyOf(b).isKinematic) {
+        bodyOf(b).position.add(amount)
+        bodyOf(b).transform.setPosition(bodyOf(b).position)
+        bodyOf(b).update()
+      } else if (!bodyOf(a).isKinematic) {
+        bodyOf(a).position.addScaledVector(amount, -1.0)
+        bodyOf(a).transform.setPosition(bodyOf(a).position)
+        bodyOf(a).update()
       }
 
       /* Adjust velocities. */
-      if (!a.body.isKinematic) {
-        a.body.velocity.addScaledVector(normal, -a.body.velocity.dot(normal))
+      if (!bodyOf(a).isKinematic) {
+        bodyOf(a).velocity.addScaledVector(
+          normal,
+          -bodyOf(a).velocity.dot(normal))
         /* Apply friction. TODO change constant. */
-        a.body.velocity.addScaledVector(a.body.velocity, -0.1)
+        bodyOf(a).velocity.addScaledVector(bodyOf(a).velocity, -0.1)
       }
-      if (!b.body.isKinematic) {
-        b.body.velocity.addScaledVector(normal, -b.body.velocity.dot(normal))
+      if (!bodyOf(b).isKinematic) {
+        bodyOf(b).velocity.addScaledVector(
+          normal,
+          -bodyOf(b).velocity.dot(normal))
         /* Apply friction. TODO change constant. */
-        b.body.velocity.addScaledVector(b.body.velocity, -0.1)
+        bodyOf(b).velocity.addScaledVector(bodyOf(b).velocity, -0.1)
       }
     }
   }
 
-  cScene.overlapped.subscribe(onOverlap)
-
-  return Object.freeze({
+  const ret = Object.freeze({
     add (body) {
       if (!body.isKinematic) {
         dynamicBodies.push(body)
@@ -295,4 +357,9 @@ export function scene ({ gravity, tolerance }) {
       cScene.update()
     }
   })
+
+  privateMaps.overlap.set(ret, privateMaps.overlap.get(cScene))
+  overlap(ret).subscribe(onOverlap)
+
+  return ret
 }
