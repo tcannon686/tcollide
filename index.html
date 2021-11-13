@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Home</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Home</h1>
+
+    
+
+
+
+    
+
+
+    <h3> </h3>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    <section>
+        <article><h1>tcollide</h1>
+<p>tcollide is a simple 3D collision detection library for three.js that uses the
+GJK and EPA algorithms. The current physics model is very simple, something
+along the lines of:</p>
+<pre class="prettyprint source lang-javascript"><code>if (objectsAreColliding()) {
+  dont()
+}
+</code></pre>
+<p>Nonetheless, maybe it will be useful for some people.</p>
+<h2>Usage</h2>
+<p>Install it using <code>npm install tcollide</code></p>
+<h3>Creating shapes</h3>
+<p>Shapes in tcollide are called &quot;supports&quot;. A support is a function that given a
+direction <code>d</code> returns the point on the shape with the highest dot product with
+<code>d</code>.</p>
+<p>Supports can be created using several factory methods. Most methods take an
+object with the desired properties as an argument. Here are some examples:</p>
+<pre class="prettyprint source lang-javascript"><code>import { sphere, box } from 'tcollide'
+const myCircle = sphere({ position: [0, 1, 2], radius: 3 })
+const myDefaultCircle = sphere({})
+const myBox = box({ position: [1, 2, 3], size: [3, 2, 1] })
+</code></pre>
+<p>In addition to basic shapes, tcollide also includes some options for combining
+shapes. Note that the result of these operations is always another convex shape.
+On example is the <code>hull(...supports)</code> method, which combines support functions
+by running each of them on the given vector, and then returning the result with
+the highest dot product. <code>hull</code> can be used to create a capsule by combining two
+spheres:</p>
+<pre class="prettyprint source lang-javascript"><code>import { sphere, hull } from 'tcollide'
+const myCapsule = hull(
+  sphere({ position: [0, 1, 0] }),
+  sphere({})
+)
+</code></pre>
+<p>There is also the <code>sum(...supports)</code> function, which simply adds the result of
+each support together. This could be used to create cool shapes like a rounded
+box:</p>
+<pre class="prettyprint source lang-javascript"><code>import { sphere, box, sum } from 'tcollide'
+const myRoundedBox = sum(sphere({}), box({}))
+</code></pre>
+<h3>Creating bodies</h3>
+<p>A body is a collection of supports that move together. Bodies can be transformed
+and moved around. Bodies are created using the <code>body</code> factory method:</p>
+<pre class="prettyprint source lang-javascript"><code>import { body, sphere } from 'tcollide'
+const myBody = body({ supports: [sphere({})], isKinematic: true })
+</code></pre>
+<p>Once you have created a body, you can move it around as much as you like by
+changing <code>Body.transform</code>, which is a Matrix4 from three.js. Just make sure to
+call <code>Body.update()</code> after!</p>
+<pre class="prettyprint source lang-javascript"><code>myBody.transform.setPosition(1, 2, 3)
+myBody.update()
+</code></pre>
+<p>If you want, you can subscribe to changes in the body's position. To do so, use
+the <code>changed(body)</code> function. This function returns an RxJS observable. Here is
+an example:</p>
+<pre class="prettyprint source lang-javascript"><code>import { changed } from 'tcollide'
+changed(myBody).subscribe(() => {
+  console.log(myBody.position)
+})
+</code></pre>
+<h3>Creating scenes</h3>
+<p>A scene is a collection of bodies. To create a scene and add bodies to it, do
+this:</p>
+<pre class="prettyprint source lang-javascript"><code>import { scene } from 'tcollide'
+const myScene = scene({})
+myScene.add(myBody)
+</code></pre>
+<p>To increment the physics simulation, run <code>Scene.update(dt)</code>, where dt is the
+elapsed time in seconds. This will trigger changes in all of the bodies. If you
+subscribed to the changes using <code>changed(body)</code>, this callback will be run!</p>
+<h2>API reference</h2>
+<p>Please see <a href="https:%5C/%5C/tcannon686.github.io/tcollide">https://tcannon686.github.io/tcollide</a> for the complete API
+reference.</p></article>
+    </section>
+
+
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#beginOverlap">beginOverlap</a></li><li><a href="global.html#body">body</a></li><li><a href="global.html#bodyOf">bodyOf</a></li><li><a href="global.html#box">box</a></li><li><a href="global.html#changed">changed</a></li><li><a href="global.html#circle">circle</a></li><li><a href="global.html#collisionScene">collisionScene</a></li><li><a href="global.html#createProfiler">createProfiler</a></li><li><a href="global.html#endOverlap">endOverlap</a></li><li><a href="global.html#hull">hull</a></li><li><a href="global.html#overlap">overlap</a></li><li><a href="global.html#point">point</a></li><li><a href="global.html#profiler">profiler</a></li><li><a href="global.html#scene">scene</a></li><li><a href="global.html#sphere">sphere</a></li><li><a href="global.html#split">split</a></li><li><a href="global.html#stayOverlap">stayOverlap</a></li><li><a href="global.html#sum">sum</a></li><li><a href="global.html#transformable">transformable</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Sat Nov 13 2021 15:35:34 GMT-0800 (Pacific Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
