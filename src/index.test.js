@@ -13,6 +13,8 @@ import {
   stayOverlap
 } from './index.js'
 
+import { toArray } from 'rxjs/operators'
+
 test('basic scene test', () => {
   const s = scene({})
   const b = body({
@@ -62,7 +64,6 @@ test('basic observable test', () => {
   let cBeginOverlapCount = 0
   let bEndOverlapCount = 0
   let cEndOverlapCount = 0
-  let overlapCount = 0
 
   let cChangedCount = 0
 
@@ -119,10 +120,47 @@ test('basic observable test', () => {
 
 test('body accessors', () => {
   const bod = body({
-    supports: [ box({}) ]
+    supports: [box({})]
   })
-  
+
   bod.supports.forEach(support => {
     expect(bodyOf(support)).toBe(bod)
   })
+})
+
+test('getOverlap on a scene', () => {
+  const s = scene({})
+  const a = body({
+    supports: [box({})]
+  })
+  const b = body({
+    supports: [box({ position: [2, 0, 0] })]
+  })
+  const c = body({
+    supports: [box({ position: [4, 0, 0] })]
+  })
+
+  s.add(a)
+  s.add(b)
+  s.add(c)
+
+  const expectOverlap = (observable, body) => {
+    observable.pipe(toArray()).subscribe((array) => {
+      expect(array.length).toBe(1)
+      const { support, other, amount } = array[0]
+      expect(support).toBeDefined()
+      expect(amount).toBeDefined()
+      expect(amount.length()).toBeGreaterThan(0)
+      expect(bodyOf(support)).toBe(null)
+      expect(bodyOf(other)).toBe(body)
+    })
+  }
+
+  expectOverlap(s.getOverlap(box({ position: [0, 0.25, 0] })), a)
+  expectOverlap(s.getOverlap(box({ position: [2, 0.25, 0] })), b)
+  expectOverlap(s.getOverlap(box({ position: [4, 0.25, 0] })), c)
+  s.getOverlap(box({ position: [3, 2, 0] })).pipe(toArray()).subscribe(
+    array => {
+      expect(array).toBe([])
+    })
 })

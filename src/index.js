@@ -51,7 +51,7 @@ const privateMaps = {
  *
  * @param {Body} body
  */
-export function changed(body) {
+export function changed (body) {
   return privateMaps.changed.get(body).asObservable()
 }
 
@@ -61,7 +61,7 @@ export function changed(body) {
  *
  * @param {Body} body
  */
-export function beginOverlap(body) {
+export function beginOverlap (body) {
   return privateMaps.beginOverlap.get(body).asObservable()
 }
 
@@ -71,7 +71,7 @@ export function beginOverlap(body) {
  *
  * @param {Body} body
  */
-export function endOverlap(body) {
+export function endOverlap (body) {
   return privateMaps.endOverlap.get(body).asObservable()
 }
 
@@ -81,7 +81,7 @@ export function endOverlap(body) {
  *
  * @param {Body} body
  */
-export function stayOverlap(body) {
+export function stayOverlap (body) {
   return privateMaps.stayOverlap.get(body).asObservable()
 }
 
@@ -91,7 +91,7 @@ export function stayOverlap(body) {
  *
  * @param {Scene} scene
  */
-export function overlap(scene) {
+export function overlap (scene) {
   return privateMaps.overlap.get(scene).asObservable()
 }
 
@@ -160,6 +160,9 @@ export function bodyOf (support) {
  * @property {Function} add - Add a body to the scene
  * @property {Function} remove - Remove a body from the scene
  * @property {Function} update - Update the scene, trigger events
+ * @property {Function} getOverlap - Given a support, returns an observable that
+ *                                   emits OverlapInfo objects for each object
+ *                                   the support is overlapping.
  * @typedef CollisionScene
  */
 
@@ -261,6 +264,9 @@ export function collisionScene ({ tolerance }) {
     },
     update () {
       updated.next()
+    },
+    getOverlap (out, support) {
+      return tree.getOverlap(out, support)
     }
   })
 
@@ -273,6 +279,9 @@ export function collisionScene ({ tolerance }) {
  * @property {Function} remove - Remove a Body from the scene
  * @property {Function} update - Update the scene given dt, the delta time in
  *                               seconds
+ * @property {Function} getOverlap - Given a support, returns an observable that
+ *                                   emits OverlapInfo objects for each object
+ *                                   the support is overlapping.
  * @typedef Scene
  */
 
@@ -355,6 +364,9 @@ export function scene ({ gravity, tolerance }) {
         body.update()
       })
       cScene.update()
+    },
+    getOverlap (out, support) {
+      return cScene.getOverlap(out, support)
     }
   })
 

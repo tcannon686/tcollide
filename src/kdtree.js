@@ -2,8 +2,17 @@ import { Vector3 } from 'three'
 import { getOverlap } from './gjk.js'
 import { quickselect } from './quickselect.js'
 import { profiler } from './profile'
+import { Observable } from 'rxjs'
 
 const axes = ['x', 'y', 'z']
+const startDirs = [
+  new Vector3(-1, 0, 0),
+  new Vector3(0, -1, 0),
+  new Vector3(0, 0, -1),
+  new Vector3(1, 0, 0),
+  new Vector3(0, 1, 0),
+  new Vector3(0, 0, 1)
+]
 
 function overlaps (left, right) {
   return (
@@ -26,14 +35,7 @@ function LeafNode (support, root) {
   this.updateBox()
 }
 
-LeafNode.prototype.startDirs = [
-  new Vector3(-1, 0, 0),
-  new Vector3(0, -1, 0),
-  new Vector3(0, 0, -1),
-  new Vector3(1, 0, 0),
-  new Vector3(0, 1, 0),
-  new Vector3(0, 0, 1)
-]
+LeafNode.prototype.startDirs = startDirs
 
 LeafNode.prototype.updateBox = function () {
   for (let i = 0; i < this.startDirs.length; i++) {
@@ -169,8 +171,8 @@ InnerNode.prototype.generate = function () {
 
     this.axisIndex = (
       (variances[0] > variances[1])
-      ? (variances[0] > variances[2] ? 0 : 2)
-      : (variances[1] > variances[2] ? 1 : 2)
+        ? (variances[0] > variances[2] ? 0 : 2)
+        : (variances[1] > variances[2] ? 1 : 2)
     )
     this.axisName = axes[this.axisIndex]
 
@@ -274,6 +276,11 @@ KdTree.prototype.remove = function (support) {
   this.needsRebuild = true
 }
 
+KdTree.prototype.rebuild = function () {
+  this.root = innerNode([...this.nodes], null)
+  this.needsRebuild = false
+}
+
 KdTree.prototype.dfs = function (node, tree, out) {
   if (tree) {
     if (overlaps(node, tree)) {
@@ -332,8 +339,7 @@ KdTree.prototype.handleUpdate = function (node) {
 
   /* Rebuild the tree if necessary. */
   if (this.needsRebuild) {
-    this.root = innerNode([...this.nodes], null)
-    this.needsRebuild = false
+    this.rebuild()
   }
 
   this.visited.clear()
@@ -354,6 +360,57 @@ KdTree.prototype.handleUpdate = function (node) {
       profiler().data.updateStopwatch.stop()
     }
   }
+}
+
+KdTree.prototype.dfsGetOverlap = function (support, box, tree, subscriber, out) {
+  if (tree) {
+    if (overlaps(box, tree)) {
+      const initialAxis = new Vector3(1, 0, 0)
+      const other = tree.node.support
+      if (
+        getOverlap(
+          out,
+          support,
+          other,
+          initialAxis,
+          this.tolerance)
+      ) {
+        subscriber.next({
+          amount: out.clone(),
+          support,
+          other
+        })
+      }
+      this.dfsGetOverlap(support, box, tree.left, out)
+      this.dfsGetOverlap(support, box, tree.right, out)
+    }
+  }
+  return null
+}
+
+KdTree.prototype.getOverlap = function (support) {
+  /* Get the bounding box of the support. */
+  const box = {
+    min: new Vector3(),
+    max: new Vector3()
+  }
+  const dirs = startDirs.map(x => new Vector3())
+  for (let i = 0; i < startDirs.length; i++) {
+    support(dirs[i].copy(startDirs[i]))
+  }
+  box.min.set(dirs[0].x, dirs[1].y, dirs[2].z)
+  box.max.set(dirs[3].x, dirs[4].y, dirs[5].z)
+
+  /* Rebuild the tree if necessary. */
+  if (this.needsRebuild) {
+    this.rebuild()
+  }
+
+  const out = new Vector3()
+  return new Observable(subscriber => {
+    this.dfsGetOverlap(support, box, this.root, subscriber, out)
+    subscriber.complete()
+  })
 }
 
 KdTree.prototype.dispose = function () {
