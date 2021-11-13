@@ -2,6 +2,7 @@
   "name": "tcollide",
   "version": "0.3.0",
   "description": "A simple collision detection library for three.js",
+  "homepage": "https://tcannon686.github.io/tcollide",
   "type": "module",
   "main": "src/index.js",
   "author": "Thomas Cannon <tom-cannon@playcannon.com>",
@@ -12,6 +13,7 @@
   },
   "devDependencies": {
     "@babel/plugin-transform-modules-commonjs": "^7.13.0",
+    "gh-pages": "^3.2.3",
     "jest": "^26.6.3",
     "jsdoc": "^3.6.6",
     "standard": "^16.0.3"
@@ -19,6 +21,8 @@
   "scripts": {
     "lint": "standard",
     "test": "jest",
-    "makedocs": "jsdoc -r src README.md -d ./docs/"
+    "makedocs": "jsdoc -r src README.md -d ./build/docs",
+    "predeploy": "npm run makedocs",
+    "deploy": "yarn publish && gh-pages -d ./build/docs"
   }
 }
