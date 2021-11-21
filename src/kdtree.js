@@ -381,8 +381,8 @@ KdTree.prototype.dfsGetOverlap = function (support, box, tree, subscriber, out) 
           other
         })
       }
-      this.dfsGetOverlap(support, box, tree.left, out)
-      this.dfsGetOverlap(support, box, tree.right, out)
+      this.dfsGetOverlap(support, box, tree.left, subscriber, out)
+      this.dfsGetOverlap(support, box, tree.right, subscriber, out)
     }
   }
   return null
@@ -406,9 +406,8 @@ KdTree.prototype.getOverlap = function (support) {
     this.rebuild()
   }
 
-  const out = new Vector3()
   return new Observable(subscriber => {
-    this.dfsGetOverlap(support, box, this.root, subscriber, out)
+    this.dfsGetOverlap(support, box, this.root, subscriber, this.out)
     subscriber.complete()
   })
 }

@@ -265,8 +265,8 @@ export function collisionScene ({ tolerance }) {
     update () {
       updated.next()
     },
-    getOverlap (out, support) {
-      return tree.getOverlap(out, support)
+    getOverlap (support) {
+      return tree.getOverlap(support)
     }
   })
 
@@ -365,8 +365,8 @@ export function scene ({ gravity, tolerance }) {
       })
       cScene.update()
     },
-    getOverlap (out, support) {
-      return cScene.getOverlap(out, support)
+    getOverlap (support) {
+      return cScene.getOverlap(support)
     }
   })
 
